@@ -31,7 +31,14 @@ uv run --locked explore-server --model fixture
 127.0.0.1:8000の `GET /ping` と `POST /invocations` を提供する。終了はCtrl+C。
 fixtureは実際のStrandsツールとDuckDBを動かすが、モデルは固定応答。
 質問内容にかかわらずスキーマ確認と新宿区の年別集計を行い、外部APIは呼ばない。
+推論表示の確認用に、サンプルであることを明記した固定テキストも送信する。
 Next.jsの起動・HTTP疎通テストは [appのREADME](../app/README.md) を参照。
+
+モデルのAPIが返す推論テキストはAG-UIの `REASONING_*` イベントでチャットへ渡す。
+CopilotKitの標準表示を使い、生成中は展開、終了後は折りたたんで再表示できる。
+次の質問に含まれる `reasoning` メッセージは、モデルへ渡す前に除外する。
+RAWイベントと暗号化された推論値は送信しない。モデルが推論テキストを返さない場合は表示されない。
+推論を有効にするモデル固有パラメータは自動追加しない。さくらでの返却有無はモデルごとの実API検証が必要。
 
 ## AgentCore用コンテナ
 

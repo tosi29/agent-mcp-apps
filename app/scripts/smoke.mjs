@@ -59,6 +59,19 @@ if (!live) {
   assert.ok(textEvents.length >= 2);
   assert.ok(textEvents.at(-1).elapsed_ms - textEvents[0].elapsed_ms >= 200,
     "Text must arrive incrementally instead of being buffered until completion");
+  const reasoning = events.filter(e => e.type === "REASONING_MESSAGE_CONTENT");
+  assert.ok(reasoning.length >= 2, "Missing incremental fixture reasoning");
+  assert.ok(reasoning.map(e => e.delta).join("").includes("接続検証用サンプル"));
+  assert.ok(agent.messages.some(m => m.role === "reasoning"),
+    "Reasoning must remain in the client message history for rendering");
+  const followupEvents = [];
+  agent.addMessage({ id: crypto.randomUUID(), role: "user", content: "同じ条件でもう一度集計して" });
+  await agent.runAgent({}, {
+    onEvent({ event }) { followupEvents.push(event); },
+  });
+  assert.equal(followupEvents.filter(e => e.type === "RUN_ERROR").length, 0);
+  assert.equal(followupEvents.at(-1).type, "RUN_FINISHED",
+    "A follow-up containing reasoning history must succeed");
 }
 const summary = {
   mode: status.mode, metrics, events: events.length,

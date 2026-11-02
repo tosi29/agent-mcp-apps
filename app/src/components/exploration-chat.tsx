@@ -1,7 +1,7 @@
 "use client";
 
-import { CopilotChat, CopilotKitProvider, useAgent } from "@copilotkit/react-core/v2";
-import { useEffect, useRef, useState } from "react";
+import { CopilotChat, CopilotChatReasoningMessage, CopilotKitProvider, useAgent } from "@copilotkit/react-core/v2";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/paths";
 import { resultHistorySubscriber, type DataResult, type ResultRun } from "../lib/result-history";
 
@@ -18,6 +18,11 @@ const columnNames: Record<string, string> = {
   price_yen: "取引総額（円）", area_m2: "面積（㎡）",
   baseline: "基準値", current: "比較値", difference: "差分", percent_change: "増減率（%）",
 };
+
+function ReasoningHeader(props: ComponentProps<typeof CopilotChatReasoningMessage.Header>) {
+  return <CopilotChatReasoningMessage.Header {...props} label={props.isStreaming
+    ? "考え中…" : props.elapsedSeconds === undefined ? "推論内容" : `推論 ${props.elapsedSeconds}秒`} />;
+}
 
 function ChatWorkspace() {
   const { agent, isReady } = useAgent({ agentId: "explorer" });
@@ -65,6 +70,7 @@ function ChatWorkspace() {
         className="explorer-chat"
         inspectorTools={false}
         welcomeScreen={false}
+        messageView={{ reasoningMessage: { header: ReasoningHeader } }}
         input={{ showDisclaimer: false }}
         labels={{
           chatInputPlaceholder: "例：新宿区を年別に集計して、件数と平均取引総額を教えて",

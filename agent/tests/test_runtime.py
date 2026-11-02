@@ -67,6 +67,13 @@ def response(body, streaming):
         ]
     else:
         deltas = [{"content": "合成データの"}, {"content": "検索結果です。"}]
+    if reasoning := message.get("reasoning_content"):
+        middle = len(reasoning) // 2
+        deltas = [
+            {"reasoning_content": reasoning[:middle]},
+            {"reasoning_content": reasoning[middle:]},
+            *deltas,
+        ]
     chunks = []
     for delta, finish in [*[(d, None) for d in deltas], ({}, body["choices"][0]["finish_reason"])]:
         chunks.append(

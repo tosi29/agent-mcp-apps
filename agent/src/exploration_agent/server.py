@@ -126,7 +126,7 @@ async def _agui_events(
             async for event in adapter.run(trusted_run):
                 if event.type == EventType.RUN_STARTED:
                     started = True
-                if event.type in {EventType.RAW} or event.type.value.startswith("REASONING"):
+                if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
                     continue
                 if event.type == EventType.RUN_ERROR:
                     yield RunErrorEvent(
@@ -217,6 +217,12 @@ def create_app(
             raise HTTPException(422, "conversation too long; start a new conversation")
         if not run.messages or run.messages[-1].role != "user":
             raise HTTPException(422, "a new user message is required")
+        # Reasoning is displayed by the client, but is not replayed as conversation input.
+        run = run.model_copy(
+            update={
+                "messages": [message for message in run.messages if message.role != "reasoning"]
+            }
+        )
         for message in run.messages:
             if message.role not in {"user", "assistant", "tool"}:
                 raise HTTPException(422, "only conversation messages are accepted")

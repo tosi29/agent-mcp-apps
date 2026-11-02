@@ -28,6 +28,15 @@ class FixtureModel(Model):
     async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
         self.calls += 1
         yield {"messageStart": {"role": "assistant"}}
+        if self.calls == 1:
+            yield {"contentBlockStart": {"start": {}}}
+            for text in [
+                "これは推論表示の接続検証用サンプルです。実際のモデルの推論ではありません。",
+                "データ項目を確認してから、新宿区の年別集計を実行します。",
+            ]:
+                await asyncio.sleep(0.1)
+                yield {"contentBlockDelta": {"delta": {"reasoningContent": {"text": text}}}}
+            yield {"contentBlockStop": {}}
         if self.calls <= (3 if self.compare else 2):
             name = "describe_dataset" if self.calls == 1 else "aggregate_transactions"
             args = {} if self.calls == 1 else {"municipality": "新宿区", "group_by": "year"}
