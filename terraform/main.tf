@@ -82,7 +82,6 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     local.sakura_enabled ? {
       SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
       SAKURA_MODEL_ID               = var.sakura_model_id == null ? "" : var.sakura_model_id
-      SAKURA_FREE_PLAN_CONFIRMED    = tostring(var.sakura_free_plan_confirmed)
     } : {}
   )
 
@@ -105,10 +104,6 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     precondition {
       condition     = local.sakura_enabled == (var.sakura_model_id != null)
       error_message = "さくら接続はsakura_api_key_parameter_nameとsakura_model_idを両方指定してください。"
-    }
-    precondition {
-      condition     = !local.sakura_enabled || var.sakura_free_plan_confirmed
-      error_message = "さくらの無償プランを確認しsakura_free_plan_confirmed=trueを指定してください。"
     }
   }
 

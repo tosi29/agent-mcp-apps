@@ -8,4 +8,3 @@
 # さくらを使う場合のみ指定。SecureStringの作成・値の登録はTerraformの外で行う。
 # sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
 # sakura_model_id = "利用するモデルID"
-# sakura_free_plan_confirmed = true

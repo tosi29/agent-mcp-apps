@@ -34,7 +34,7 @@ def parser() -> argparse.ArgumentParser:
     result = commands.add_parser("result", help="保存した上限付き結果を取得（API不要）")
     result.add_argument("request_id")
     result.add_argument("result_id")
-    ask = commands.add_parser("ask", help="さくらへ質問。無償プランの確認とキー設定が必要")
+    ask = commands.add_parser("ask", help="さくらへ質問。APIキーとモデルIDの設定が必要")
     ask.add_argument("prompt")
     ask.add_argument("--sse", action="store_true", help="HTTPではなく標準出力にSSEフレームを出す")
     ask.add_argument("--no-stream", action="store_true", help="非streamモードで互換性を切り分ける")

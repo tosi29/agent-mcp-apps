@@ -31,12 +31,6 @@ variable "sakura_model_id" {
   }
 }
 
-variable "sakura_free_plan_confirmed" {
-  description = "使用するAPIキーとモデルの無償プランを利用者が確認したことを示す。"
-  type        = bool
-  default     = false
-}
-
 variable "allowed_source_cidrs" {
   description = "ブラウザ検証を許可する送信元CIDR。terraform.tfvarsで利用端末のグローバルIPv4/32等を指定する。"
   type        = set(string)

@@ -87,16 +87,14 @@ state、tfvars、plan、ZIP、実行結果はGitに含めない。
 カスタマー管理KMSキーを使う場合は、対象キーへの復号権限を別途設計する。
 パラメータ本体・値の登録はTerraformの管理対象にせず、値をstateへ取り込むデータソースも設けない。
 
-`terraform.tfvars` には名前とモデルIDだけを設定し、既存の無償プラン確認も行う。
+`terraform.tfvars` には名前とモデルIDを設定する。
 
 ```hcl
 sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
 sakura_model_id               = "preview/Kimi-K2.7-Code"
-sakura_free_plan_confirmed    = true
 ```
 
 モデルIDは設定例。使用するAPIキーの契約・モデルの利用可否・無償枠の残りを利用者が確認する。
-確認フラグは契約や残枠をAPIで検査する機能ではない。
 名前とモデルIDを両方省略すればfixture、両方指定すればさくらとなる。
 AgentCoreの実行ロールには、そのパラメータ1つの `ssm:GetParameter` だけを付与する。
 起動・ページ表示ではキーを取得せず、AgentCoreが各runで復号取得する。Next.jsはキーを受け取らない。

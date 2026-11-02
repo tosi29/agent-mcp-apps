@@ -33,7 +33,6 @@ def ssm(monkeypatch):
     monkeypatch.setenv("EXPLORER_MODEL_MODE", "sakura")
     monkeypatch.setenv("SAKURA_API_KEY_PARAMETER_NAME", NAME)
     monkeypatch.setenv("SAKURA_MODEL_ID", "test-model")
-    monkeypatch.setenv("SAKURA_FREE_PLAN_CONFIRMED", "true")
     with Stubber(client) as stub:
         yield stub, sessions
         stub.assert_no_pending_responses()

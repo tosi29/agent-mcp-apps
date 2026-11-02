@@ -239,14 +239,18 @@ async def test_request_timeout(parquet, tmp_path):
     assert events[-1]["status"] == "error"
 
 
-def test_live_calls_require_explicit_configuration(monkeypatch):
-    monkeypatch.delenv("SAKURA_FREE_PLAN_CONFIRMED", raising=False)
-    with pytest.raises(ValueError, match="無償プラン"):
-        SakuraSettings.from_env()
-    monkeypatch.setenv("SAKURA_FREE_PLAN_CONFIRMED", "true")
+def test_sakura_settings_require_key_and_model(monkeypatch):
     monkeypatch.delenv("SAKURA_API_KEY", raising=False)
+    monkeypatch.delenv("SAKURA_MODEL_ID", raising=False)
     with pytest.raises(ValueError, match="SAKURA_API_KEY"):
         SakuraSettings.from_env()
+    monkeypatch.setenv("SAKURA_API_KEY", "test-key")
+    with pytest.raises(ValueError, match="SAKURA_MODEL_ID"):
+        SakuraSettings.from_env()
+    monkeypatch.setenv("SAKURA_MODEL_ID", "test-model")
+    settings = SakuraSettings.from_env()
+    assert settings.api_key == "test-key"
+    assert settings.model_id == "test-model"
 
 
 def test_sse_frame_encoding(capsys):

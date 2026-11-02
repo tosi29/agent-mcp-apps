@@ -49,7 +49,7 @@ IAM認証はAgentCore側で行う。既存のローカル起動コマンドは�
 配備方法は [TerraformのREADME](../terraform/README.md) を参照。
 
 AgentCoreでさくらを使う場合は、`EXPLORER_MODEL_MODE=sakura`、`SAKURA_API_KEY_PARAMETER_NAME`、
-`SAKURA_MODEL_ID`、`SAKURA_FREE_PLAN_CONFIRMED=true` を設定する。Terraformが名前と設定だけを渡す。
+`SAKURA_MODEL_ID` を設定する。Terraformが名前と設定だけを渡す。
 APIキーは事前作成したSSM SecureStringの値に保存し、各runで `GetParameter(WithDecryption=True)` から取得する。
 起動・`/ping` では取得しないため、キーを起動時スナップショットに固定しない。キー更新は次のrunから反映する。
 SSM取得や設定の失敗時にfixtureへ切り替えることはない。
@@ -70,10 +70,9 @@ chmod 600 .env
 | --- | --- |
 | `SAKURA_API_KEY` | 利用者のAPIキー |
 | `SAKURA_MODEL_ID` | アカウントで利用可能なモデルID |
-| `SAKURA_FREE_PLAN_CONFIRMED` | 利用者が無償プランと残枠を確認した場合に `true` |
 
 `.env.example` のモデルIDは設定例で、利用可否や互換性を保証するものではない。
-確認フラグは契約・残枠をAPIで照会する機能ではなく、必要なフラグ・キー・モデルIDが未設定なら起動しない。
+APIキーとモデルIDが未設定なら起動しない。
 APIキーはPython側で管理し、Next.jsやブラウザへ渡さない。
 
 チャット画面向けのサーバーを起動する。
