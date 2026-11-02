@@ -1,6 +1,8 @@
 "use client";
 
-import { CopilotChat, CopilotChatReasoningMessage, CopilotKitProvider, useAgent } from "@copilotkit/react-core/v2";
+import {
+  CopilotChat, CopilotChatReasoningMessage, CopilotKitProvider, useAgent, useDefaultRenderTool,
+} from "@copilotkit/react-core/v2";
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/paths";
 import { resultHistorySubscriber, type DataResult, type ResultRun } from "../lib/result-history";
@@ -26,6 +28,7 @@ function ReasoningHeader(props: ComponentProps<typeof CopilotChatReasoningMessag
 
 function ChatWorkspace() {
   const { agent, isReady } = useAgent({ agentId: "explorer" });
+  useDefaultRenderTool();
   const [runs, setRuns] = useState<ResultRun[]>([]);
   const [error, setError] = useState("");
   const historyRef = useRef<HTMLDivElement>(null);
@@ -70,7 +73,7 @@ function ChatWorkspace() {
         className="explorer-chat"
         inspectorTools={false}
         welcomeScreen={false}
-        messageView={{ reasoningMessage: { header: ReasoningHeader } }}
+        messageView={{ toolCallDisplay: "line", reasoningMessage: { header: ReasoningHeader } }}
         input={{ showDisclaimer: false }}
         labels={{
           chatInputPlaceholder: "例：新宿区を年別に集計して、件数と平均取引総額を教えて",
