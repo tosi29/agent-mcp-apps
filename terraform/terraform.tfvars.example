@@ -1,0 +1,3 @@
+# 初回は未指定でECRとIAMを作成する。
+# イメージをpush後、取得したダイジェストをterraform.tfvarsに保存する。
+# agent_image_digest = "sha256:..."

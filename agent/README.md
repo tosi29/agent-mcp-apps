@@ -33,6 +33,21 @@ fixtureは実際のStrandsツールとDuckDBを動かすが、モデルは固定
 質問内容にかかわらずスキーマ確認と新宿区の年別集計を行い、外部APIは呼ばない。
 Next.jsの起動・HTTP疎通テストは [appのREADME](../app/README.md) を参照。
 
+## AgentCore用コンテナ
+
+リポジトリ直下でARM64イメージをビルドする。
+
+```sh
+docker build --platform linux/arm64 -t agent-mcp-apps-agent:poc agent
+docker run --rm -p 127.0.0.1:8080:8080 agent-mcp-apps-agent:poc
+```
+
+コンテナはAgentCore用の `0.0.0.0:8080` で待ち受けるfixture専用サーバー。
+Strands・DuckDB・合成Parquetを含み、`.env`・APIキー・実データは含めない。
+`/ping` がhealthyになる前にデータを検証し、接続・結果ID・リクエスト状態は操作ごとに作る。
+IAM認証はAgentCore側で行う。既存のローカル起動コマンドはループバック限定を維持する。
+配備方法は [TerraformのREADME](../terraform/README.md) を参照。
+
 ## さくらAI Engineへの接続
 
 利用するモデル、基盤モデル無償プランの契約、残枠をコントロールパネルで確認する。
@@ -179,6 +194,7 @@ AG-UIでは入力制限・イベント・履歴再送・UIプレビューの非�
 | `runtime.py` | Pythonツール、Strandsフック、さくらモデル設定 |
 | `cli.py` | CLI、JSONL/SSE出力 |
 | `server.py` | FastAPI・AG-UI、リクエスト制約 |
+| `agentcore_server.py` | AgentCore用fixtureサーバーの起動設定 |
 | `fixture_model.py` | API不要の固定シナリオ |
 
 コードは `src/exploration_agent/` に配置する。

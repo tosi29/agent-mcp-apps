@@ -134,6 +134,7 @@ def create_app(
     results_dir: Path,
     *,
     mode: str,
+    trusted_hosts: list[str] | None = None,
 ) -> FastAPI:
     app = FastAPI(
         docs_url=None,
@@ -148,7 +149,10 @@ def create_app(
         },
     )
     app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
+        TrustedHostMiddleware,
+        allowed_hosts=trusted_hosts
+        if trusted_hosts is not None
+        else ["127.0.0.1", "localhost", "testserver"],
     )
     busy = asyncio.Lock()
 

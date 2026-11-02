@@ -15,7 +15,7 @@ Browser / Next.js + CopilotKit
 | --- | --- |
 | `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
 | `agent/` | PythonのCLI・AG-UIサーバー、検索・集計ツール。uvで管理 |
-| `terraform/` | 将来のAWS IaC配置先。未実装 |
+| `terraform/` | AgentCore Runtime V2・ECR・IAMのIaC |
 
 ## セットアップ
 
@@ -67,9 +67,10 @@ APIキーは `agent/.env` にだけ置く。質問・会話履歴・ツール結
 
 ## 制約と詳細
 
-対象はローカルの合成Parquet。実データ取り込み、S3対応、AWS配備、認証・会話の永続化は未実装。
-ローカル単独利用を前提とし、モデルから任意SQLは受け付けない。
+対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
+ローカル単独利用を前提とし、モデルから任意SQLは受け付けない。AWS向け構成はfixture検証用。
 結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)
 - [agent：接続設定、CLI、ツール、実行制約、自動テスト](agent/README.md)
+- [terraform：AgentCoreへの配備](terraform/README.md)
