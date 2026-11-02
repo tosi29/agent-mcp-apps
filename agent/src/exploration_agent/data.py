@@ -5,11 +5,23 @@ from __future__ import annotations
 import math
 import threading
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import duckdb
+from duckdb import (
+    DuckDBPyConnection,
+    DuckDBPyRelation,
+    Expression,
+    col,
+    count_all,
+    fn,
+    lit,
+    star,
+    when,
+)
 
 MAX_ROWS = 200
 COLUMNS = {
@@ -55,31 +67,38 @@ class Filters:
     min_price_yen: int | None = None
     max_price_yen: int | None = None
 
-    def sql(self) -> tuple[str, list[Any]]:
+    def expression(self) -> Expression:
         if not isinstance(self.municipality, str) or len(self.municipality) > 40:
             raise ValueError("municipality must be a string of at most 40 characters")
-        clauses, values = [], []
-        municipality = unicodedata.normalize("NFKC", self.municipality).strip()
-        if municipality:
-            clauses.append("municipality = ?")
-            values.append(municipality)
-        for name, value, low, high, op in (
-            ("year", self.year, 1900, 2100, "="),
-            ("min_price_yen", self.min_price_yen, 0, 10**12, ">="),
-            ("max_price_yen", self.max_price_yen, 0, 10**12, "<="),
+        for name, value, low, high in (
+            ("year", self.year, 1900, 2100),
+            ("min_price_yen", self.min_price_yen, 0, 10**12),
+            ("max_price_yen", self.max_price_yen, 0, 10**12),
         ):
             if value is not None:
                 _integer(name, value, low, high)
-                column = "year" if name == "year" else "price_yen"
-                clauses.append(f"{column} {op} ?")
-                values.append(value)
         if (
             self.min_price_yen is not None
             and self.max_price_yen is not None
             and self.min_price_yen > self.max_price_yen
         ):
             raise ValueError("min_price_yen exceeds max_price_yen")
-        return (" WHERE " + " AND ".join(clauses) if clauses else ""), values
+        predicate = lit(True)
+        municipality = unicodedata.normalize("NFKC", self.municipality).strip()
+        if municipality:
+            predicate &= col("municipality") == lit(municipality)
+        if self.year is not None:
+            predicate &= col("year") == lit(self.year)
+        if self.min_price_yen is not None:
+            predicate &= col("price_yen") >= lit(self.min_price_yen)
+        if self.max_price_yen is not None:
+            predicate &= col("price_yen") <= lit(self.max_price_yen)
+        return predicate
+
+
+def _page(relation: DuckDBPyRelation, order: Expression, limit: int) -> DuckDBPyRelation:
+    # Count before LIMIT, including grouped results, without a separate count query.
+    return relation.select(star(), count_all().over().alias("_total")).order(order).limit(limit)
 
 
 class DataExplorer:
@@ -97,7 +116,9 @@ class DataExplorer:
             raise ValueError("timeout_seconds must be finite and positive")
         self.timeout_seconds = timeout_seconds
 
-    def _query(self, sql: str, params: list[Any]) -> list[dict[str, Any]]:
+    def _query(
+        self, build: Callable[[DuckDBPyConnection], DuckDBPyRelation]
+    ) -> list[dict[str, Any]]:
         with duckdb.connect(
             config={
                 "threads": 1,
@@ -115,15 +136,29 @@ class DataExplorer:
             timer.daemon = True
             timer.start()
             try:
-                cursor = conn.execute(sql, params)
-                names = [column[0] for column in cursor.description]
-                return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+                # Relations are lazy: keep the timeout active through fetchall().
+                relation = build(conn)
+                names = relation.columns
+                return [dict(zip(names, row, strict=True)) for row in relation.fetchall()]
             finally:
                 timer.cancel()
                 timer.join()
 
     def describe(self) -> dict[str, Any]:
-        schema = self._query("DESCRIBE transactions", [])
+        schema = self._query(
+            lambda conn: (
+                conn.table_function("pragma_table_info", ["transactions"])
+                .order(col("cid"))
+                .select(
+                    col("name").alias("column_name"),
+                    col("type").alias("column_type"),
+                    when(col("notnull")).then(lit("NO")).otherwise(lit("YES")).alias("null"),
+                    when(col("pk")).then(lit("PRI")).otherwise(lit(None)).alias("key"),
+                    col("dflt_value").alias("default"),
+                    lit(None).alias("extra"),
+                )
+            )
+        )
         actual = {column["column_name"] for column in schema}
         if actual != set(COLUMNS):
             raise ValueError("unsupported schema; this PoC accepts only its synthetic fixture")
@@ -133,36 +168,54 @@ class DataExplorer:
             "notice": "架空データ。国交省の実データではなく、市場価格の判断に使えません。",
             "columns": [{**column, "meaning": COLUMNS[column["column_name"]]} for column in schema],
             "municipalities": self._query(
-                "SELECT DISTINCT municipality FROM transactions ORDER BY municipality LIMIT 20", []
+                lambda conn: (
+                    conn.table("transactions")
+                    .select(col("municipality"))
+                    .distinct()
+                    .order(col("municipality"))
+                    .limit(20)
+                )
             ),
-            "row_count": self._query("SELECT count(*) AS n FROM transactions", [])[0]["n"],
+            "row_count": self._query(
+                lambda conn: conn.table("transactions").aggregate([count_all().alias("n")])
+            )[0]["n"],
             "max_result_rows": MAX_ROWS,
         }
 
     def search(self, filters: Filters, limit: int = 100) -> dict[str, Any]:
         _integer("limit", limit, 1, MAX_ROWS)
-        where, params = filters.sql()
+        predicate = filters.expression()
         rows = self._query(
-            "SELECT *, count(*) OVER() AS _total FROM transactions"
-            + where
-            + " ORDER BY transaction_id LIMIT ?",
-            [*params, limit],
+            lambda conn: _page(
+                conn.table("transactions").filter(predicate), col("transaction_id"), limit
+            )
         )
         return self._result(rows, limit, "transactions")
 
     def aggregate(self, group_by: str, filters: Filters) -> dict[str, Any]:
         if group_by not in GROUPS:
             raise ValueError("group_by must be municipality, year, or quarter")
-        group = GROUPS[group_by]
-        where, params = filters.sql()
-        rows = self._query(
-            f"WITH grouped AS (SELECT {group}, count(*) AS transaction_count, "
-            "round(avg(price_yen), 2) AS average_price_yen, "
-            "min(price_yen) AS min_price_yen, max(price_yen) AS max_price_yen "
-            f"FROM transactions{where} GROUP BY {group}) "
-            f"SELECT *, count(*) OVER() AS _total FROM grouped ORDER BY {group} LIMIT ?",
-            [*params, MAX_ROWS],
-        )
+        group = col(GROUPS[group_by])
+        predicate = filters.expression()
+
+        def build(conn: DuckDBPyConnection) -> DuckDBPyRelation:
+            grouped = (
+                conn.table("transactions")
+                .filter(predicate)
+                .aggregate(
+                    [
+                        group,
+                        count_all().alias("transaction_count"),
+                        fn("round", col("price_yen").mean(), lit(2)).alias("average_price_yen"),
+                        col("price_yen").min().alias("min_price_yen"),
+                        col("price_yen").max().alias("max_price_yen"),
+                    ],
+                    group_expr=group,
+                )
+            )
+            return _page(grouped, group, MAX_ROWS)
+
+        rows = self._query(build)
         return self._result(rows, MAX_ROWS, "groups")
 
     @staticmethod

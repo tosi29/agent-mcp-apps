@@ -33,7 +33,7 @@ AWS側にも必要な公式機能はあるため、構成を否定する仕様�
 | Runtimeセッション | 公式ではセッションごとのmicroVM分離、既定のアイドル15分、最長8時間。終了後の同じIDは新環境になり得る | Runtimeのセッション維持はStrands会話の永続化を自動実装しない。ローカルPoCは1質問1Agent。永続セッションは未設計 |
 | API Gateway | ストリーミング対応はREST API。`HTTP_PROXY`/`AWS_PROXY`、`responseTransferMode=STREAM` が対象。HTTP APIには適用しない | AWS・ブラウザを通したTTFB/チャンク遅延/切断動作は未計測 |
 | Lambda統合 | `InvokeWithResponseStream` と `.../2021-11-15/functions/.../response-streaming-invocations` の統合URIが必要。通常のInvokeとは異なる | メタデータJSON + 8 null bytes + 本文という出力契約を守る必要。単にSSE文字列をreturnする実装では不十分 |
-| DuckDB | 固定SQL・入力検証・バインド・許可パス・外部アクセス無効・設定ロックをローカル実行。別ファイル読取拒否/中断もテスト済み | memory_limitはOS上限ではない。大容量Parquet、S3、spill、プロセス隔離、実負荷時の並列性は未評価 |
+| DuckDB | Relational/Expression APIによる検索・集計・スキーマ取得、入力検証・許可パス・外部アクセス無効・設定ロックをローカル実行。別ファイル読取拒否/中断もテスト済み | memory_limitはOS上限ではない。大容量Parquet、S3、spill、プロセス隔離、実負荷時の並列性は未評価 |
 | 結果分離 | ツール内部で上限付きデータを保存し別イベントへ投影。モデルには最大3行の要約だけを返す。実SDKが次のHTTPリクエストへ送る内容で確認 | 参照IDのHTTP取得、認証/所有権、TTL、全量取得、複数インスタンス間共有は未実装 |
 
 Strandsの根拠:
@@ -54,8 +54,12 @@ AWSの根拠:
 [Lambda streaming統合の契約](https://docs.aws.amazon.com/apigateway/latest/developerguide/response-transfer-mode-lambda.html)。
 DuckDBの根拠:
 [セキュリティ設定](https://duckdb.org/docs/preview/operations_manual/securing_duckdb/overview)、
-[2.0設定一覧](https://duckdb.org/docs/2.0/configuration/overview)。
+[2.0設定一覧](https://duckdb.org/docs/2.0/configuration/overview)、
+[2.0 Relational API](https://duckdb.org/docs/2.0/clients/python/relational_api)、
+[2.0 Expression API](https://duckdb.org/docs/2.0/clients/python/expression)。
 preview文書の記述だけには依存せず、採用した2.0.0で実際の設定適用をテストした。
+検索条件は `col()` と `lit()`、集計は `aggregate()`、LIMIT前の件数は `count_all().over()` で構築する。
+遅延実行の取得完了までタイムアウト監視を維持する。移行前後43パターンの結果一致をローカルで確認した。
 
 ## ストリーミング構成の評価
 
