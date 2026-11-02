@@ -1,168 +1,133 @@
 # app — Next.js + CopilotKit
 
-ローカルのデータ探索チャット。Next.js 16.4.4 / React 19.3.1 / CopilotKit 1.83.0。
-AG-UIクライアント1.0.3 / TypeScript 7.0.2。
-Node.js 26.13.0、npm、Python側はuvを使う。Nodeのバージョンはルートの `.node-version` に記録する。
-
-## 依存関係の互換性
-
-CopilotKit 1.83.0は `@ag-ui/client` 1.0.2を固定参照している。
-直接依存の1.0.3と混在すると、`HttpAgent` と `AbstractAgent` のprivateメンバーの
-宣言元が異なり、Runtimeへの登録で型エラーになる。
-`package.json` の `overrides` で、間接依存のクライアントも直接依存と同じバージョンへ揃える。
-`$@ag-ui/client` の参照により、更新時にoverride側だけ古い値が残ることを避ける。
-これはAG-UI全パッケージの一括上書きではなく、クライアントだけが対象。
-将来の更新での互換性は保証せず、依存更新時は型チェック・build・fixture疎通を再確認する。
-
-Next.js 16.4.4の標準CLI型チェックを有効にしたままTypeScript 7を使用する。
-overrideの仕様は [npm公式ドキュメント](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#overrides) を参照。
+データ探索用のローカルチャット。回答文、ツール実行状況、検索・集計結果を表示する。
+Node.jsのバージョンは [../.node-version](../.node-version)、依存関係は
+[package.json](package.json) と [package-lock.json](package-lock.json) で管理する。
 
 ```text
 Browser / CopilotKit React v2
   → Next.js /api/copilotkit/*（CopilotKit TypeScript Runtime v2）
     → HttpAgent / AG-UI SSE
-      → agent/ のFastAPI :8000/invocations
-        → ag-ui-strands → Strands → さくらAI Engine / DuckDB
+      → Python /invocations → Strands → さくらAI Engine / DuckDB
 ```
 
-TypeScript Runtimeはローカルの中継で、CopilotKitのクラウド契約やAPIキーは使っていない。
-推論APIキーは `agent/.env` にだけ置く。Next.jsやブラウザへ渡さない。
-`app/` のAGENT_URLはサーバー専用。現段階ではlocalhostのHTTPだけを許可する。
-AWS経由に切り替える際は認証も含めて別途設計する。
+Runtimeはローカルの中継で、CopilotKitのクラウド契約やAPIキーは不要。
+推論APIキーはPython側にだけ置き、Next.jsやブラウザへ渡さない。
 
 ## 起動
 
-Node.js 26.13.0を用意する。nodenvではリポジトリ直下の `.node-version` が適用される。
-最初にPython側のサンプルを準備する。生成済みなら `prepare-sample` は省略する。
+[ルートのセットアップ](../README.md#セットアップ)でPythonの依存と合成データを用意する。
+以下はそれぞれリポジトリ直下から、別々のターミナルで実行する。
 
 ```sh
+# ターミナル1：外部API不要の固定シナリオ
 cd agent
-uv sync --locked
-uv run explore prepare-sample
-```
-
-ターミナル1（さくらAPIを使う）:
-
-```sh
-cd agent
-uv run --locked --env-file .env explore-server
-```
-
-APIを使わず接続だけ確認する場合は、代わりに次を使う:
-
-```sh
 uv run --locked explore-server --model fixture
 ```
 
-fixtureは本物のStrandsツールとDuckDBを実行するが、モデルは固定シナリオ。
-質問内容にかかわらず、新宿区の年別集計を実行する。画面にもその旨を表示する。
-自然言語の理解やモデル精度の検証には使わない。
-
-ターミナル2:
-
 ```sh
+# ターミナル2
 cd app
 npm ci --ignore-scripts
 npm run dev
 ```
 
-ブラウザで <http://127.0.0.1:3000> を開く。各プロセスはCtrl+Cで停止。
-両方とも127.0.0.1にだけバインドする。3000/8000ポートが既に使用中なら、
-既存プロセスを確認して停止してから起動する。
+<http://127.0.0.1:3000> を開く。Pythonは127.0.0.1:8000、Next.jsは127.0.0.1:3000で待ち受ける。
+終了は各ターミナルでCtrl+C。ポートが使用中なら、既存プロセスを確認してから起動する。
 
-設定変更が必要な場合のみ `cp .env.example .env.local` を実行する。
-既定のローカル接続には `app/.env.local` の作成は不要。
+さくらを使う場合は、[agentの接続設定](../agent/README.md#さくらai-engineへの接続)を行い、
+ターミナル1のコマンドを `uv run --locked --env-file .env explore-server` に変更する。
+質問送信と実API用の疎通テストは推論APIを呼び出す。
 
-## 画面で確認すること
-
-例: 「項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて」
-
-- 送信後に文章が逐次表示され、最後に入力欄が送信可能へ戻る。
-- スキーマ確認・集計の進捗と完了が表示される。
-- 「検索・集計結果」に年別3行、各年40件、平均42,500,000円が表示される。
-- 回答に合成データであることが明示される。
-- 停止、エラー表示、狭い画面での入力・結果表の横スクロールを確認する。
-
-これは架空データの期待値であり、実際の市場価格ではない。
-
-## イベントと履歴
-
-標準AG-UIの文章・ツールイベントに加え、次の `CUSTOM` イベントを受け取る:
-
-| name | 用途 |
-| --- | --- |
-| `data_result` | request_id / result_id / tool_call_id、件数、最大20行のプレビュー |
-| `tool_status` | 実際のツール実行の成功/失敗。TOOL_CALL_ENDとは別に扱う |
-| `run_metrics` | モデル呼び出し回数、ツール実行回数、ツールエラー数 |
-
-`TOOL_CALL_END` はAG-UIでは引数生成の終端であり、DuckDB処理の完了とは限らない。
-実行の成否は `tool_status` で表示する。
-
-プレビューはReactの画面状態にだけ保持し、AG-UIの `state` や会話メッセージへ追加しない。
-LLMへのツール結果は従来どおり最大3行のサンプルと件数・参照ID。
-次の質問では会話メッセージを再送するが、画面用プレビューをモデルへ送り直さない。
-右ペインへ表示を移す場合も `data_result` を再利用できる。
-
-履歴はCopilotKitのInMemoryAgentRunnerに置く。上限は10スレッド、各5run、
-保持済みイベント約8MBを指定しているが、実行中イベント全体の厳密なメモリ上限ではない。
-永続化やログイン・ユーザーごとの権限制御は未実装。ローカル単独利用が対象。
-Python側は1リクエストごとにAgentと制約を生成し、受信会話をAG-UIアダプターで再構成する。
-40メッセージ超や128KiB超のリクエストは拒否する。長い会話はページを再読み込みして始め直す。
-
-## 検証
+本番ビルドで起動する場合は、開発サーバーを停止し、`app/` で実行する。
 
 ```sh
-cd app
+npm run build
+npm run start
+```
+
+## 設定
+
+既定のローカル接続では、Next.js側の環境ファイルは不要。
+接続先を変更する場合のみ `.env.example` を `.env.local` にコピーし、`AGENT_URL` を設定する。
+既定値は `http://127.0.0.1:8000/invocations`。localhostまたは127.0.0.1のHTTPだけを許可する。
+
+## 画面の確認
+
+質問例：「項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて」
+
+- 回答文が逐次表示され、完了後に再び送信できる。
+- ツールの実行状況と、回答文から独立した結果表が表示される。
+- 合成データの年別集計は2023〜2025年の3行で、各年40件・平均42,500,000円。
+- 停止・エラー表示と、狭い画面での入力・表の横スクロールを確認する。
+
+fixtureモードは質問内容にかかわらずこの集計を行う。固定シナリオであることを画面にも表示する。
+合成データの値は、実際の市場価格を示すものではない。
+
+## テスト
+
+`app/` で型チェックとビルドを実行する。
+
+```sh
 npm run typecheck
 npm run build
 ```
 
-APIなしのフル経路テスト（Python側をfixtureモードで起動）:
+Pythonをfixtureモード、Next.jsを開発または本番モードで起動した状態でHTTP疎通を確認する。
 
 ```sh
 npm run smoke
 ```
 
-さくらを使う明示的な疎通試験（実API呼び出しあり、最大4モデル呼び出し/質問）:
+Next.js RuntimeからPythonツールまでを通し、ストリーム、独立した結果イベント、
+合成データの期待値、正常終端、テレメトリ無効設定を検査する。
+ブラウザ描画とモデルの推論品質は対象外。
+
+実APIで同じ経路を試す場合は、Pythonをさくらモードで起動して明示的に指定する。
+1質問で最大4回のモデルAPI呼び出しを消費する。
 
 ```sh
 npm run smoke -- --live
 ```
 
-`--live` の有無とバックエンドのモードが一致しない場合は、推論を実行する前に停止する。
-標準AG-UIクライアントでNext.js RuntimeからPythonまでを通し、
-テキスト・独立結果イベント・期待値・正常終端・telemetry無効状態を確認する。
-証跡はGit除外対象の `agent/results/agui-<mode>-smoke.json`。
-**このスクリプトはブラウザ描画を検証しない。**
+指定とバックエンドのモードが一致しない場合は、推論前に停止する。
+結果はGit除外対象の `agent/results/agui-<mode>-smoke.json` に保存する。
 
-初回実装では型チェック・production build・fixtureのフル経路を確認。
-さくら実環境でも3モデル呼び出し・2ツール実行・エラー0で成功した。
-最初の文章約1.99秒、独立結果約4.45秒、終端約6.19秒。
-これはNext.js HTTP経路の単発測定であり、画面に描画される時刻ではない。
-ブラウザ自動操作は環境で許可されなかったため、自動画面確認は未実施。
+## イベントと履歴
 
-2026-11-02のPR #1修正では、Node.js 26.13.0 / npm 11.20.0 / TypeScript 7.0.2で、
-lockファイルからのクリーンインストール、型チェック、production buildを確認した。
-`npm run dev` と `npm run start` の両方でfixtureのフルHTTP経路が成功し、
-各runはツール2回・エラー0・独立した構造化結果・正常終端となった。
-Pythonの26テストとruffも成功。今回の依存更新後の実さくらAPI・ブラウザ描画は未検証。
+標準AG-UIイベントに加え、次の `CUSTOM` イベントを受け取る。
+
+| name | 用途 |
+| --- | --- |
+| `data_result` | request_id / result_id / tool_call_id、件数、最大20行のプレビュー |
+| `tool_status` | ツール実行の成功・失敗 |
+| `run_metrics` | モデル・ツールの呼び出し回数、ツールエラー数 |
+
+`TOOL_CALL_END` は引数生成の終端で、実行完了は `tool_status` で扱う。
+プレビューはReactの画面状態に保持し、共有stateや会話メッセージへ追加しない。
+後続の質問で会話を再送するときも、画面用プレビューをモデルへ送り直さない。
+モデルへ返すツール結果は件数・最大3行のサンプル・参照ID。
+
+会話はInMemoryAgentRunnerに一時保持する。上限は10スレッド、各5run、保持済みイベント約8MB。
+実行中イベント全体の厳密なメモリ上限ではない。Pythonは同時1runで、
+40メッセージ超または128KiB超のリクエストを拒否する。
+会話が長くなった場合はページを再読み込みして新しい会話を始める。
+認証・永続化・ユーザーごとの履歴管理は未実装。
 
 ## テレメトリ
 
 `npm run dev/build/start/typecheck` は `NEXT_TELEMETRY_DISABLED=1`、
-`COPILOTKIT_TELEMETRY_DISABLED=true`、`DO_NOT_TRACK=1` を設定して起動する。
-`/api/copilotkit/info` の `telemetryDisabled: true` も確認した。
-`.npmrc` の `ignore-scripts=true` で依存パッケージのインストールスクリプトも実行しない。
+`COPILOTKIT_TELEMETRY_DISABLED=true`、`DO_NOT_TRACK=1` を設定する。
+`.npmrc` の `ignore-scripts=true` で依存のインストールスクリプトも無効にする。
+`DO_NOT_TRACK` は対応ライブラリが尊重する設定で、外部通信全体の遮断機能ではない。
+さくらへの質問・会話履歴・ツール結果の要約送信は推論に必要な別経路。
+仕様は [Next.js](https://nextjs.org/telemetry) と [CopilotKit](https://docs.copilotkit.ai/telemetry) を参照。
 
-未停止時のNext.jsの宛先は `telemetry.nextjs.org`、今回のCopilotKit v2 Runtime/Inspectorは
-`telemetry.copilotkit.ai/ingest`。公式説明では前者は利用/ビルド情報、後者は
-会話・状態・ツール内容を除く製品メタデータ。CopilotKitの依存には旧経路のSegmentコードもある。
-DO_NOT_TRACKは対応ライブラリが尊重する環境変数であり、全通信を遮断する仕組みではない。
-全依存のパケット監査は行っていない。さくらへの質問・会話・要約送信は推論に必要な別経路。
+## 依存関係の互換性
 
-根拠:
-[CopilotKit Runtime](https://docs.copilotkit.ai/strands/copilot-runtime)、
-[AG-UI Strands](https://github.com/ag-ui-protocol/ag-ui/tree/main/integrations/aws-strands/python)、
-[CopilotKit telemetry](https://docs.copilotkit.ai/telemetry)、
-[Next.js telemetry](https://nextjs.org/telemetry)。
-資料の例は旧APIを含むため、実装は導入済み1.83.0の型定義と動作確認を優先した。
+CopilotKit 1.83.0は `@ag-ui/client` 1.0.2を固定参照しており、直接依存の1.0.3と混在すると
+`HttpAgent` と `AbstractAgent` のprivateメンバーの宣言元が異なるため型エラーになる。
+`overrides` に `$@ag-ui/client` を指定し、間接依存のクライアントも直接依存と同じ版に揃える。
+全AG-UIパッケージの一括上書きではない。更新時は型チェック・ビルド・fixture疎通で互換性を確認する。
+Next.jsの標準CLI型チェックでTypeScript 7を使用する。
+仕様は [npm公式ドキュメント](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#overrides) を参照。
