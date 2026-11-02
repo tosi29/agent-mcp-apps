@@ -199,7 +199,9 @@ def create_app(
 
         async def generate():
             try:
-                async for event in agui_events(run, model_factory(), parquet, results_dir):
+                # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
+                model = await asyncio.to_thread(model_factory)
+                async for event in agui_events(run, model, parquet, results_dir):
                     yield encoder.encode(event)
             except Exception:
                 yield encoder.encode(

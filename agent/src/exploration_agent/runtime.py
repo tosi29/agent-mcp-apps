@@ -46,15 +46,15 @@ class SakuraSettings:
     stream: bool = True
 
     @classmethod
-    def from_env(cls, stream: bool = True) -> SakuraSettings:
+    def from_env(cls, stream: bool = True, *, api_key: str | None = None) -> SakuraSettings:
         if os.environ.get("SAKURA_FREE_PLAN_CONFIRMED") != "true":
             raise ValueError(
                 "基盤モデル無償プランを確認しSAKURA_FREE_PLAN_CONFIRMED=trueを設定してください"
             )
-        key = os.environ.get("SAKURA_API_KEY", "").strip()
+        key = (os.environ.get("SAKURA_API_KEY", "") if api_key is None else api_key).strip()
         model = os.environ.get("SAKURA_MODEL_ID", "").strip()
         if not key or not model:
-            raise ValueError("SAKURA_API_KEYとSAKURA_MODEL_IDをagent/.envに設定してください")
+            raise ValueError("SAKURA_API_KEYとSAKURA_MODEL_IDを設定してください")
         return cls(key, model, stream)
 
     def build_model(self) -> OpenAIModel:

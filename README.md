@@ -63,13 +63,14 @@ cd agent
 uv run --locked --env-file .env explore-server
 ```
 
-APIキーは `agent/.env` にだけ置く。質問・会話履歴・ツール結果の要約が推論APIへ送られる。
+ローカルのAPIキーは `agent/.env` に置く。AWSでは事前作成したParameter StoreのSecureString名を指定する。
+質問・会話履歴・ツール結果の要約が推論APIへ送られる。
 モデルの利用可否・無償枠は利用者のアカウントで確認する。
 
 ## 制約と詳細
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
-モデルから任意SQLは受け付けない。AWS向け構成はfixture検証用で、送信元IPを制限する。
+モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。
 結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)

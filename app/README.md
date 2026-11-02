@@ -54,7 +54,8 @@ npm run start
 
 AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN` を設定する。`AGENT_URL` より優先する。
 東京リージョンのRuntimeに接続し、AWS認証は標準チェーンを使う。Lambdaでは実行ロールから取得する。
-`InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。AWS上のエージェントはfixture専用。
+`InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。接続モードはRuntimeの `EXPLORER_MODEL_MODE` から取得する。
+モードが未設定なら `unknown` とし、fixtureとみなさない。
 
 ## Lambdaへの配備
 
@@ -114,6 +115,9 @@ Next.js RuntimeからPythonツールまでを通し、静的ファイルの取�
 ```sh
 npm run smoke -- --live
 ```
+
+AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用する。実API検証は利用者の許可後に実行する。
+実モデルでは応答が短時間で完了する場合があるため、固定200ms間隔の検査はfixtureだけに適用する。
 
 指定とバックエンドのモードが一致しない場合は、推論前に停止する。
 結果はGit除外対象の `agent/results/agui-<mode>-smoke.json` に保存する。

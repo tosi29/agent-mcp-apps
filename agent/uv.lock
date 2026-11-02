@@ -250,6 +250,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ag-ui-protocol" },
     { name = "ag-ui-strands" },
+    { name = "boto3" },
     { name = "duckdb" },
     { name = "fastapi" },
     { name = "strands-agents", extra = ["openai"] },
@@ -269,6 +270,7 @@ dev = [
 requires-dist = [
     { name = "ag-ui-protocol", specifier = "==1.0.0" },
     { name = "ag-ui-strands", specifier = "==1.0.2" },
+    { name = "boto3", specifier = "==1.43.123" },
     { name = "duckdb", specifier = "==2.0.0" },
     { name = "fastapi", specifier = "==0.162.0" },
     { name = "strands-agents", extras = ["openai"], specifier = "==1.63.0" },

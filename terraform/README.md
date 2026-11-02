@@ -1,17 +1,18 @@
 # Terraform
 
-東京リージョン（`ap-northeast-1`）に、ブラウザから使うNext.jsとfixtureエージェントを配置する。
+東京リージョン（`ap-northeast-1`）に、ブラウザから使うNext.jsと探索エージェントを配置する。
 
 ```text
 Browser → API Gateway Regional REST API /poc/（送信元IP制限）
   → Lambda Node.js 26 / ARM64 ZIP
     → Web Adapter → Next.js / CopilotKit Runtime
-      → AgentCore Runtime V2 / AG-UI → Strands fixture → DuckDB
+      → AgentCore Runtime V2 / AG-UI → Strands → DuckDB
 ```
 
 Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
 AWS認証は標準の認証情報チェーンを使用し、account ID変数は設けない。
-AgentCoreはfixture専用で、さくらAPIは呼ばない。Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
+AgentCoreは既定でfixture。Parameter Storeのキー参照とモデルIDを指定した場合にさくらAPIを使用する。
+Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
 
 既存の中継LambdaはNext.jsを起動するLambdaへ更新する。`moved` ブロックでTerraform上のアドレスを移し、
 既存の関数・実行ロール・ロググループ名は維持する。
@@ -76,8 +77,33 @@ terraform -chdir=terraform apply web.tfplan
 terraform -chdir=terraform output -raw web_url
 ```
 
-`web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送るとAWS上のfixtureを実行する。
+`web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送ると設定したモードで実行する。
 state、tfvars、plan、ZIP、実行結果はGitに含めない。
+
+## さくらのAPIキーを指定する
+
+利用者がParameter Storeにパラメータを事前作成する。リージョンは東京、タイプは `SecureString`、
+値はAPIキーそのものを指定する。標準パラメータと既定の暗号鍵 `alias/aws/ssm` を前提とする。
+カスタマー管理KMSキーを使う場合は、対象キーへの復号権限を別途設計する。
+パラメータ本体・値の登録はTerraformの管理対象にせず、値をstateへ取り込むデータソースも設けない。
+
+`terraform.tfvars` には名前とモデルIDだけを設定し、既存の無償プラン確認も行う。
+
+```hcl
+sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
+sakura_model_id               = "preview/Kimi-K2.7-Code"
+sakura_free_plan_confirmed    = true
+```
+
+モデルIDは設定例。使用するAPIキーの契約・モデルの利用可否・無償枠の残りを利用者が確認する。
+確認フラグは契約や残枠をAPIで検査する機能ではない。
+名前とモデルIDを両方省略すればfixture、両方指定すればさくらとなる。
+AgentCoreの実行ロールには、そのパラメータ1つの `ssm:GetParameter` だけを付与する。
+起動・ページ表示ではキーを取得せず、AgentCoreが各runで復号取得する。Next.jsはキーを受け取らない。
+
+SSM対応の新しいエージェントイメージをECRへpushし、`agent_image_digest` を更新してから切り替える。
+旧fixture専用イメージのまま設定だけを変更しない。Next.jsの接続モード表示も更新するため、Web用ZIPも再ビルド・配備する。
+push・apply・実API検証は実行前に確認する。SSMの実権限とさくらの応答は、デプロイ後の検証が必要。
 
 ## 動作確認
 
@@ -99,7 +125,7 @@ SMOKE_URL="$WEB_URL" npm run smoke
 - APIのリソースポリシーで指定CIDR以外を明示的に拒否する。OIDCとユーザー単位の認証は未実装。
 - API Gatewayの `STREAM` とWeb Adapterの `response_stream` を併用し、Next.jsの圧縮は無効にする。
 - AgentCore呼び出しは自動再試行せず、runごとに新しいセッションを使う。会話はAG-UIメッセージで渡す。
-- 接続状態は `GetAgentRuntime` のREADY状態で判定する。推論品質を示すものではない。
+- 接続状態は `GetAgentRuntime` のREADY状態、モードは同APIの環境設定から判定する。推論品質やAPIキーの有効性を示すものではない。
 - 入力は128KiB、Python側で40メッセージまで。上流SSEは2MiB・1フレーム256K文字まで。
 - AgentCoreへの通信は130秒、Lambdaは150秒、API Gatewayは155秒で制限する。上流の異常終了は `RUN_ERROR` にする。
 - APIは毎秒10件・バースト30件でスロットリングする。静的ファイル取得も対象で、費用の厳密な上限ではない。

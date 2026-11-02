@@ -42,11 +42,18 @@ docker build --platform linux/arm64 -t agent-mcp-apps-agent:poc agent
 docker run --rm -p 127.0.0.1:8080:8080 agent-mcp-apps-agent:poc
 ```
 
-コンテナはAgentCore用の `0.0.0.0:8080` で待ち受けるfixture専用サーバー。
+コンテナはAgentCore用の `0.0.0.0:8080` で待ち受ける。既定はfixtureで、Terraformの設定によりさくらへ接続する。
 Strands・DuckDB・合成Parquetを含み、`.env`・APIキー・実データは含めない。
 `/ping` がhealthyになる前にデータを検証し、接続・結果ID・リクエスト状態は操作ごとに作る。
 IAM認証はAgentCore側で行う。既存のローカル起動コマンドはループバック限定を維持する。
 配備方法は [TerraformのREADME](../terraform/README.md) を参照。
+
+AgentCoreでさくらを使う場合は、`EXPLORER_MODEL_MODE=sakura`、`SAKURA_API_KEY_PARAMETER_NAME`、
+`SAKURA_MODEL_ID`、`SAKURA_FREE_PLAN_CONFIRMED=true` を設定する。Terraformが名前と設定だけを渡す。
+APIキーは事前作成したSSM SecureStringの値に保存し、各runで `GetParameter(WithDecryption=True)` から取得する。
+起動・`/ping` では取得しないため、キーを起動時スナップショットに固定しない。キー更新は次のrunから反映する。
+SSM取得や設定の失敗時にfixtureへ切り替えることはない。
+SSMの実権限とさくらの接続は、デプロイ後の実API検証が必要。
 
 ## さくらAI Engineへの接続
 
@@ -194,7 +201,8 @@ AG-UIでは入力制限・イベント・履歴再送・UIプレビューの非�
 | `runtime.py` | Pythonツール、Strandsフック、さくらモデル設定 |
 | `cli.py` | CLI、JSONL/SSE出力 |
 | `server.py` | FastAPI・AG-UI、リクエスト制約 |
-| `agentcore_server.py` | AgentCore用fixtureサーバーの起動設定 |
+| `agentcore_server.py` | AgentCore用サーバーの起動設定と接続モード選択 |
+| `parameter_store.py` | runごとのSecureString取得とさくらモデル生成 |
 | `fixture_model.py` | API不要の固定シナリオ |
 
 コードは `src/exploration_agent/` に配置する。

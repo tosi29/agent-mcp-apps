@@ -16,13 +16,16 @@ export function agentRuntimeArn(): string | undefined {
   return arn || undefined;
 }
 
-export async function runtimeReady(): Promise<boolean> {
+export async function runtimeStatus() {
   const arn = agentRuntimeArn();
-  if (!arn) return false;
+  if (!arn) return { connected: false, mode: "unknown" };
   const response = await control.send(new GetAgentRuntimeCommand({
     agentRuntimeId: arn.slice(arn.lastIndexOf("/") + 1),
   }), { abortSignal: AbortSignal.timeout(5_000) });
-  return response.status === "READY";
+  const configuredMode = response.environmentVariables?.EXPLORER_MODEL_MODE;
+  // Unknown configuration must not let the fixture smoke command trigger live inference.
+  const mode = configuredMode === "fixture" || configuredMode === "sakura" ? configuredMode : "unknown";
+  return { connected: response.status === "READY", mode };
 }
 
 type Run = { threadId: string; runId: string };

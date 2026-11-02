@@ -2,10 +2,11 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  agent_name = "agent_mcp_apps_poc"
-  account_id = data.aws_caller_identity.current.account_id
-  partition  = data.aws_partition.current.partition
-  logs_arn   = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/${local.agent_name}-*"
+  agent_name     = "agent_mcp_apps_poc"
+  account_id     = data.aws_caller_identity.current.account_id
+  partition      = data.aws_partition.current.partition
+  logs_arn       = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/${local.agent_name}-*"
+  sakura_enabled = var.sakura_api_key_parameter_name != null
 }
 
 resource "aws_ecr_repository" "agent" {
@@ -73,9 +74,17 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
   count = var.agent_image_digest == null ? 0 : 1
 
   agent_runtime_name = local.agent_name
-  description        = "Strands and DuckDB AG-UI fixture PoC"
+  description        = "Strands and DuckDB AG-UI exploration PoC"
   role_arn           = aws_iam_role.agent.arn
   platform_version   = "V2"
+  environment_variables = merge(
+    { EXPLORER_MODEL_MODE = local.sakura_enabled ? "sakura" : "fixture" },
+    local.sakura_enabled ? {
+      SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
+      SAKURA_MODEL_ID               = var.sakura_model_id == null ? "" : var.sakura_model_id
+      SAKURA_FREE_PLAN_CONFIRMED    = tostring(var.sakura_free_plan_confirmed)
+    } : {}
+  )
 
   agent_runtime_artifact {
     container_configuration {
@@ -93,7 +102,30 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
 
   lifecycle {
     prevent_destroy = true
+    precondition {
+      condition     = local.sakura_enabled == (var.sakura_model_id != null)
+      error_message = "さくら接続はsakura_api_key_parameter_nameとsakura_model_idを両方指定してください。"
+    }
+    precondition {
+      condition     = !local.sakura_enabled || var.sakura_free_plan_confirmed
+      error_message = "さくらの無償プランを確認しsakura_free_plan_confirmed=trueを指定してください。"
+    }
   }
 
-  depends_on = [aws_iam_role_policy.agent]
+  depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter]
+}
+
+resource "aws_iam_role_policy" "sakura_parameter" {
+  count = local.sakura_enabled ? 1 : 0
+
+  name = "read_sakura_api_key_parameter"
+  role = aws_iam_role.agent.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:${local.partition}:ssm:ap-northeast-1:${local.account_id}:parameter/${trimprefix(var.sakura_api_key_parameter_name, "/")}"
+    }]
+  })
 }

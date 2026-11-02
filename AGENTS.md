@@ -32,7 +32,8 @@
 
 ## 秘密情報・外部通信・相談が必要な操作
 
-- 推論APIキーはサーバー側で管理する。現在は `agent/.env` を使い、Next.js側やブラウザへコピーしない。
+- 推論APIキーはローカルでは `agent/.env`、AgentCoreでは事前作成したParameter StoreのSecureStringを使う。Next.js側やブラウザへコピーしない。
+- Parameter Storeの値をTerraformで取得・管理しない。AgentCore V2の起動時にキーを取得せず、各runで取得してモデルに渡す。プロセスの環境変数やファイルへコピーしない。
 - `.env`、実データ、実行ログ、Terraform state等をコミットしない。キーや認証ヘッダーをログ・ツール出力・資料へ表示しない。
 - テレメトリ無効化を維持し、フロントの起動・ビルドにはnpmスクリプトを使う。`DO_NOT_TRACK` を全通信の遮断機能とはみなさない。
 - 通常の検証は外部API不要のテストとfixtureモードを使う。fixtureの固定応答をモデルの推論結果として扱わない。

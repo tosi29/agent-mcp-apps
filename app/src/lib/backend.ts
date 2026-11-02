@@ -1,6 +1,6 @@
 import "server-only";
 import { HttpAgent } from "@ag-ui/client";
-import { agentRuntimeArn, fetchAgentCore, runtimeReady } from "./agentcore";
+import { agentRuntimeArn, fetchAgentCore, runtimeStatus } from "./agentcore";
 
 export function backendAgent(): HttpAgent {
   return agentRuntimeArn()
@@ -10,7 +10,7 @@ export function backendAgent(): HttpAgent {
 
 export async function backendStatus() {
   if (agentRuntimeArn()) {
-    return { connected: await runtimeReady(), mode: "fixture" };
+    return runtimeStatus();
   }
   const response = await fetch(new URL("/ping", agentUrl()), {
     cache: "no-store", signal: AbortSignal.timeout(3_000),
