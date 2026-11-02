@@ -89,11 +89,11 @@ function ChatWorkspace() {
       {runs.length === 0 ? <div className="empty-result">
         <span aria-hidden="true" className="table-symbol">▤</span>
         <p>結果はまだありません。</p>
-      </div> : runs.map((run, index) => <article className="result-run" key={run.runId} data-status={run.status}>
-        <div className="run-heading">
-          <div><span className="run-number">質問 {index + 1}</span><h3>{run.question}</h3></div>
+      </div> : runs.map((run, index) => <details className="result-run" key={run.runId} data-status={run.status} open>
+        <summary className="run-heading">
+          <span className="run-heading-text"><span className="run-number">質問 {index + 1}</span><span className="run-question">{run.question}</span></span>
           <span className="run-status" role="status">{run.status === "running" ? "実行中" : run.status === "success" ? "完了" : run.status === "error" ? "失敗" : "中断"}</span>
-        </div>
+        </summary>
         {run.tools.length > 0 && <ol className="tool-progress" aria-label={`質問${index + 1}の処理の進捗`}>
           {run.tools.map(tool => <li key={tool.id} data-status={tool.status}>
             <span className="progress-icon">{tool.status === "success" ? "✓" : tool.status === "running" ? "◌" : "!"}</span>
@@ -106,7 +106,7 @@ function ChatWorkspace() {
         {run.results.length === 0 && <p className="run-placeholder">{run.status === "running"
           ? "検索・集計結果を待っています…" : "この質問の検索・集計結果はありません。"}</p>}
         {run.metrics && <div className="run-summary">ツール実行 {run.metrics.tool_calls}回</div>}
-      </article>)}
+      </details>)}
       </div>
     </section>
     </div>

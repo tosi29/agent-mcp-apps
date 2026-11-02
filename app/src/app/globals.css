@@ -38,8 +38,13 @@ button { cursor: pointer; }
 .result-history:focus-visible { outline: 2px solid #45946c; outline-offset: -2px; }
 .result-run { padding: 18px; border: 1px solid #e2e8df; border-radius: 10px; background: #fff; }
 .result-run + .result-run { margin-top: 16px; }
-.run-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.run-heading h3 { margin: 6px 0 0; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.run-heading { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; list-style: none; border-radius: 4px; }
+.run-heading::-webkit-details-marker { display: none; }
+.run-heading::before { content: "›"; flex-shrink: 0; color: #64826b; font-size: 22px; line-height: 1; }
+.result-run[open] > .run-heading::before { transform: rotate(90deg); }
+.run-heading:focus-visible { outline: 2px solid #45946c; outline-offset: 4px; }
+.run-heading-text { flex: 1; min-width: 0; }
+.run-question { display: block; margin: 6px 0 0; font-size: 14px; font-weight: 600; line-height: 1.7; overflow-wrap: anywhere; }
 .run-number { color: #7c877f; font-size: 11px; }
 .run-status { flex-shrink: 0; font-size: 11px; color: #356750; background: #edf4ed; padding: 4px 8px; border-radius: 5px; }
 .result-run[data-status="error"] .run-status, .result-run[data-status="stopped"] .run-status { background: #fff5ef; color: #97554c; }
