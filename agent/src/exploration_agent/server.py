@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
+from functools import partial
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -22,6 +23,7 @@ from strands.models.model import Model
 
 from exploration_agent.data import DataExplorer
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_tools import ComparisonPreviewHook, connect_mcp
 from exploration_agent.results import ResultStore
 from exploration_agent.runtime import SYSTEM_PROMPT, RequestHooks, SakuraSettings, build_tools
 
@@ -35,8 +37,32 @@ async def agui_events(
     parquet: Path,
     results_dir: Path,
     *,
+    mcp_url: str | None = None,
     max_model_calls: int = 4,
     timeout_seconds: float = 120,
+) -> AsyncIterator:
+    async with connect_mcp(mcp_url) as tools:
+        async for event in _agui_events(
+            run,
+            model,
+            parquet,
+            results_dir,
+            mcp_tools=tools,
+            max_model_calls=max_model_calls,
+            timeout_seconds=timeout_seconds,
+        ):
+            yield event
+
+
+async def _agui_events(
+    run: RunAgentInput,
+    model: Model,
+    parquet: Path,
+    results_dir: Path,
+    *,
+    mcp_tools: list,
+    max_model_calls: int,
+    timeout_seconds: float,
 ) -> AsyncIterator:
     """Use the maintained Strands adapter, with fresh per-request budgets and tools."""
     request_id = uuid4().hex
@@ -56,23 +82,29 @@ async def agui_events(
             yield CustomEvent(type=EventType.CUSTOM, name="tool_status", value=status)
 
     hooks = RequestHooks(observe, max_model_calls)
+    store = ResultStore(results_dir / request_id)
     explorer = DataExplorer(parquet)
     await asyncio.to_thread(explorer.describe)
     template = Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=build_tools(explorer, ResultStore(results_dir / request_id), observe),
+        tools=build_tools(explorer, store, observe) + mcp_tools,
         callback_handler=None,
         retry_strategy=None,
     )
     adapter = StrandsAgent(
         agent=template,
         name="explorer",
-        hooks=[hooks],
+        hooks=[hooks, *([ComparisonPreviewHook(store, observe)] if mcp_tools else [])],
         config=StrandsAgentConfig(
             tool_behaviors={
                 name: ToolBehavior(custom_result_handler=custom_result)
-                for name in ("describe_dataset", "search_transactions", "aggregate_transactions")
+                for name in [
+                    "describe_dataset",
+                    "search_transactions",
+                    "aggregate_transactions",
+                    *(tool.tool_name for tool in mcp_tools),
+                ]
             },
             # Explicitly preserve no-retry behavior when the adapter clones the template.
             thread_agent_kwargs=lambda _: {"retry_strategy": None, "callback_handler": None},
@@ -134,6 +166,7 @@ def create_app(
     results_dir: Path,
     *,
     mode: str,
+    mcp_url: str | None = None,
     trusted_hosts: list[str] | None = None,
 ) -> FastAPI:
     app = FastAPI(
@@ -201,7 +234,7 @@ def create_app(
             try:
                 # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
                 model = await asyncio.to_thread(model_factory)
-                async for event in agui_events(run, model, parquet, results_dir):
+                async for event in agui_events(run, model, parquet, results_dir, mcp_url=mcp_url):
                     yield encoder.encode(event)
             except Exception:
                 yield encoder.encode(
@@ -239,6 +272,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="ローカルAG-UIサーバー")
     parser.add_argument("--model", choices=["sakura", "fixture"], default="sakura")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--mcp-url", help="ローカルMCPサーバーのURL（例：http://127.0.0.1:8001/mcp）"
+    )
     parser.add_argument("--data", type=Path, default=Path("data/synthetic.parquet"))
     parser.add_argument("--results", type=Path, default=Path("results"))
     args = parser.parse_args()
@@ -247,10 +283,10 @@ def main() -> None:
         settings = SakuraSettings.from_env()
         factory = settings.build_model
     else:
-        factory = FixtureModel
+        factory = partial(FixtureModel, compare=bool(args.mcp_url))
     DataExplorer(args.data).describe()
     uvicorn.run(
-        create_app(factory, args.data, args.results, mode=args.model),
+        create_app(factory, args.data, args.results, mode=args.model, mcp_url=args.mcp_url),
         host="127.0.0.1",
         port=args.port,
         access_log=False,

@@ -9,12 +9,14 @@ const toolNames: Record<string, string> = {
   describe_dataset: "データ項目を確認",
   search_transactions: "条件に合う取引を検索",
   aggregate_transactions: "取引データを集計",
+  compare_values: "差分・増減率を計算（MCP）",
 };
 const columnNames: Record<string, string> = {
   year: "年", municipality: "地域", quarter: "四半期", transaction_id: "取引ID",
   transaction_count: "件数", average_price_yen: "平均取引総額（円）",
   min_price_yen: "最小取引総額（円）", max_price_yen: "最大取引総額（円）",
   price_yen: "取引総額（円）", area_m2: "面積（㎡）",
+  baseline: "基準値", current: "比較値", difference: "差分", percent_change: "増減率（%）",
 };
 
 function ChatWorkspace() {

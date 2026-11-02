@@ -69,6 +69,9 @@ uv run --locked --env-file .env explore-server
 
 ## 制約と詳細
 
+既存のPythonツールに加え、ローカルで任意に接続できるMCPの数値比較ツールがある。
+構成と起動方法は [mcp/README.md](mcp/README.md) を参照。MCP Appsは使用しない。
+
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。
 結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。

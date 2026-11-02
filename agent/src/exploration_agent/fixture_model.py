@@ -9,10 +9,11 @@ from strands.models.model import Model
 
 
 class FixtureModel(Model):
-    """Always inspect the schema, then aggregate Shinjuku by year, then answer."""
+    """Inspect and aggregate Shinjuku; optionally compare values through MCP, then answer."""
 
-    def __init__(self):
+    def __init__(self, *, compare: bool = False):
         self.calls = 0
+        self.compare = compare
 
     def get_config(self) -> dict:
         return {"model_id": "fixture-no-api"}
@@ -27,9 +28,12 @@ class FixtureModel(Model):
     async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
         self.calls += 1
         yield {"messageStart": {"role": "assistant"}}
-        if self.calls <= 2:
+        if self.calls <= (3 if self.compare else 2):
             name = "describe_dataset" if self.calls == 1 else "aggregate_transactions"
             args = {} if self.calls == 1 else {"municipality": "新宿区", "group_by": "year"}
+            if self.calls == 3:
+                name = "compare_values"
+                args = {"baseline": 42_500_000, "current": 42_500_000}
             yield {
                 "contentBlockStart": {
                     "start": {
@@ -55,5 +59,16 @@ class FixtureModel(Model):
             ]:
                 await asyncio.sleep(0.1)
                 yield {"contentBlockDelta": {"delta": {"text": text}}}
+            if self.compare:
+                yield {
+                    "contentBlockDelta": {
+                        "delta": {
+                            "text": (
+                                "\nMCPツールで平均取引総額を比較しました。"
+                                "差分は0円、増減率は0%です。"
+                            )
+                        }
+                    }
+                }
             yield {"contentBlockStop": {}}
             yield {"messageStop": {"stopReason": "end_turn"}}

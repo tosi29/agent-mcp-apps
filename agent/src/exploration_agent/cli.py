@@ -38,13 +38,16 @@ def parser() -> argparse.ArgumentParser:
     ask.add_argument("prompt")
     ask.add_argument("--sse", action="store_true", help="HTTPではなく標準出力にSSEフレームを出す")
     ask.add_argument("--no-stream", action="store_true", help="非streamモードで互換性を切り分ける")
+    ask.add_argument("--mcp-url", help="ローカルMCPサーバーのURL")
     return root
 
 
 async def ask(args: argparse.Namespace) -> int:
     model = SakuraSettings.from_env(stream=not args.no_stream).build_model()
     status = 1
-    async for event in stream_question(args.prompt, model, args.data, args.results):
+    async for event in stream_question(
+        args.prompt, model, args.data, args.results, mcp_url=args.mcp_url
+    ):
         output(event, args.sse)
         if event["type"] == "done":
             status = 0 if event["status"] == "success" else 1
