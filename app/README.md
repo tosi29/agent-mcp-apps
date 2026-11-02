@@ -1,8 +1,21 @@
 # app — Next.js + CopilotKit
 
 ローカルのデータ探索チャット。Next.js 16.4.4 / React 19.3.1 / CopilotKit 1.83.0。
-AG-UIクライアントはCopilotKitの依存に合わせて1.0.2に固定した。
-Node.js 22、npm、Python側はuvを使う。
+AG-UIクライアント1.0.3 / TypeScript 7.0.2。
+Node.js 26.13.0、npm、Python側はuvを使う。Nodeのバージョンはルートの `.node-version` に記録する。
+
+## 依存関係の互換性
+
+CopilotKit 1.83.0は `@ag-ui/client` 1.0.2を固定参照している。
+直接依存の1.0.3と混在すると、`HttpAgent` と `AbstractAgent` のprivateメンバーの
+宣言元が異なり、Runtimeへの登録で型エラーになる。
+`package.json` の `overrides` で、間接依存のクライアントも直接依存と同じバージョンへ揃える。
+`$@ag-ui/client` の参照により、更新時にoverride側だけ古い値が残ることを避ける。
+これはAG-UI全パッケージの一括上書きではなく、クライアントだけが対象。
+将来の更新での互換性は保証せず、依存更新時は型チェック・build・fixture疎通を再確認する。
+
+Next.js 16.4.4の標準CLI型チェックを有効にしたままTypeScript 7を使用する。
+overrideの仕様は [npm公式ドキュメント](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#overrides) を参照。
 
 ```text
 Browser / CopilotKit React v2
@@ -19,6 +32,7 @@ AWS経由に切り替える際は認証も含めて別途設計する。
 
 ## 起動
 
+Node.js 26.13.0を用意する。nodenvではリポジトリ直下の `.node-version` が適用される。
 最初にPython側のサンプルを準備する。生成済みなら `prepare-sample` は省略する。
 
 ```sh
@@ -126,6 +140,12 @@ npm run smoke -- --live
 最初の文章約1.99秒、独立結果約4.45秒、終端約6.19秒。
 これはNext.js HTTP経路の単発測定であり、画面に描画される時刻ではない。
 ブラウザ自動操作は環境で許可されなかったため、自動画面確認は未実施。
+
+2026-11-02のPR #1修正では、Node.js 26.13.0 / npm 11.20.0 / TypeScript 7.0.2で、
+lockファイルからのクリーンインストール、型チェック、production buildを確認した。
+`npm run dev` と `npm run start` の両方でfixtureのフルHTTP経路が成功し、
+各runはツール2回・エラー0・独立した構造化結果・正常終端となった。
+Pythonの26テストとruffも成功。今回の依存更新後の実さくらAPI・ブラウザ描画は未検証。
 
 ## テレメトリ
 
