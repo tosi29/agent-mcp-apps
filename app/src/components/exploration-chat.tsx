@@ -1,21 +1,10 @@
 "use client";
 
 import { CopilotChat, CopilotKitProvider, useAgent } from "@copilotkit/react-core/v2";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/paths";
+import { resultHistorySubscriber, type DataResult, type ResultRun } from "../lib/result-history";
 
-type Row = Record<string, string | number | null>;
-type Result = {
-  result_id: string;
-  tool_call_id: string;
-  total_count: number;
-  count_unit: string;
-  returned_count: number;
-  truncated: boolean;
-  preview_truncated: boolean;
-  preview_rows: Row[];
-};
-type ToolProgress = { id: string; name: string; status: string };
 const toolNames: Record<string, string> = {
   describe_dataset: "データ項目を確認",
   search_transactions: "条件に合う取引を検索",
@@ -30,44 +19,40 @@ const columnNames: Record<string, string> = {
 
 function ChatWorkspace() {
   const { agent, isReady } = useAgent({ agentId: "explorer" });
-  const [tools, setTools] = useState<ToolProgress[]>([]);
-  const [results, setResults] = useState<Result[]>([]);
+  const [runs, setRuns] = useState<ResultRun[]>([]);
   const [error, setError] = useState("");
-  const [metrics, setMetrics] = useState<{ model_calls: number; tool_calls: number } | null>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const followResults = useRef(true);
 
   useEffect(() => {
+    const history = resultHistorySubscriber(setRuns);
     const subscription = agent.subscribe({
-      onRunStartedEvent: () => {
-        setTools([]); setResults([]); setMetrics(null); setError("");
+      ...history,
+      onRunStartedEvent: params => {
+        setError("");
+        return history.onRunStartedEvent?.(params);
       },
-      onToolCallStartEvent: ({ event }) => {
-        setTools(previous => [...previous, {
-          id: event.toolCallId, name: event.toolCallName, status: "running",
-        }]);
+      onRunErrorEvent: params => {
+        setError("処理に失敗しました。接続や実行上限を確認してください。");
+        return history.onRunErrorEvent?.(params);
       },
-      onCustomEvent: ({ event }) => {
-        if (event.name === "data_result") {
-          const value = event.value as Result;
-          if (typeof value?.result_id === "string" && Array.isArray(value.preview_rows)) {
-            setResults(previous => [...previous.filter(r => r.result_id !== value.result_id), value]);
-          }
-        } else if (event.name === "tool_status") {
-          const value = event.value as { tool_call_id: string; status: string };
-          setTools(previous => previous.map(tool => tool.id === value.tool_call_id
-            ? { ...tool, status: value.status } : tool));
-        } else if (event.name === "run_metrics") {
-          setMetrics(event.value as { model_calls: number; tool_calls: number });
-        }
+      onRunFailed: params => {
+        setError("接続に失敗しました。エージェントの起動状態を確認してください。");
+        return history.onRunFailed?.(params);
       },
-      onRunErrorEvent: () => setError("処理に失敗しました。接続や実行上限を確認してください。"),
-      onRunFailed: () => setError("接続に失敗しました。エージェントの起動状態を確認してください。"),
-      onRunFinalized: () => setTools(previous => previous.map(tool =>
-        tool.status === "running" ? { ...tool, status: "stopped" } : tool)),
     });
     return () => subscription.unsubscribe();
   }, [agent]);
 
+  useEffect(() => {
+    if (followResults.current && historyRef.current) {
+      historyRef.current.scrollTop = historyRef.current.scrollHeight;
+    }
+  }, [runs]);
+
   return <>
+    {error && <div className="error-banner" role="alert">{error}</div>}
+    <div className="exploration-workspace">
     <section className="chat-card" aria-label="データ探索チャット">
       <div className="chat-toolbar">
         <span className="toolbar-label"><span className={`status-dot ${isReady ? "connected" : ""}`} />
@@ -93,32 +78,45 @@ function ChatWorkspace() {
         onError={() => setError("チャットに接続できません。エージェントの起動状態を確認してください。")}
       />
     </section>
-    {error && <div className="error-banner" role="alert">{error}</div>}
-    <section className="result-card" aria-label="検索・集計結果">
-      <div className="result-heading"><h2>検索・集計結果</h2>
-        <span className="small-note">直近の質問</span></div>
-      {tools.length > 0 && <ol className="tool-progress" aria-label="処理の進捗">
-        {tools.map(tool => <li key={tool.id} data-status={tool.status}>
-          <span className="progress-icon">{tool.status === "success" ? "✓" : tool.status === "running" ? "◌" : "!"}</span>
-          {toolNames[tool.name] ?? tool.name}
-          <span className="small-note">{tool.status === "success" ? "完了" : tool.status === "running" ? "実行中" : "中断・失敗"}</span>
-        </li>)}
-      </ol>}
-      {results.length === 0 ? <div className="empty-result">
+    <section className="result-card" aria-label="ツールの実行結果">
+      <div className="result-heading"><h2>ツールの実行結果</h2>
+        <span className="small-note">{runs.length ? `${runs.length}件の質問` : "質問ごとに結果を追加"}</span></div>
+      <div className="result-history" ref={historyRef} onScroll={event => {
+        const panel = event.currentTarget;
+        followResults.current = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 48;
+      }} tabIndex={0} role="region" aria-label="実行結果の履歴">
+      {runs.length === 0 ? <div className="empty-result">
         <span aria-hidden="true" className="table-symbol">▤</span>
-        <p>検索・集計をすると、ここに結果が表示されます。</p>
-        <span className="small-note">回答文とは別に、数値や明細を確認できます。</span>
-      </div> : results.map(result => <ResultTable key={result.result_id} result={result} />)}
-      {metrics && <div className="run-summary" aria-live="polite">
-        処理が完了しました · ツール実行 {metrics.tool_calls}回 · モデル呼び出し {metrics.model_calls}回
-      </div>}
+        <p>検索・集計の結果がここに追加されます。</p>
+        <span className="small-note">過去の結果も残して、数値や明細を見比べられます。</span>
+      </div> : runs.map((run, index) => <article className="result-run" key={run.runId} data-status={run.status}>
+        <div className="run-heading">
+          <div><span className="run-number">質問 {index + 1}</span><h3>{run.question}</h3></div>
+          <span className="run-status" role="status">{run.status === "running" ? "実行中" : run.status === "success" ? "完了" : run.status === "error" ? "失敗" : "中断"}</span>
+        </div>
+        {run.tools.length > 0 && <ol className="tool-progress" aria-label={`質問${index + 1}の処理の進捗`}>
+          {run.tools.map(tool => <li key={tool.id} data-status={tool.status}>
+            <span className="progress-icon">{tool.status === "success" ? "✓" : tool.status === "running" ? "◌" : "!"}</span>
+            {toolNames[tool.name] ?? tool.name}
+            <span className="small-note">{tool.status === "success" ? "完了" : tool.status === "running" ? "実行中" : "中断・失敗"}</span>
+          </li>)}
+        </ol>}
+        {run.results.map(result => <ResultTable key={result.result_id} result={result}
+          label={toolNames[run.tools.find(tool => tool.id === result.tool_call_id)?.name ?? ""] ?? "検索・集計結果"} />)}
+        {run.results.length === 0 && <p className="run-placeholder">{run.status === "running"
+          ? "検索・集計結果を待っています…" : "この質問の検索・集計結果はありません。"}</p>}
+        {run.metrics && <div className="run-summary">ツール実行 {run.metrics.tool_calls}回</div>}
+      </article>)}
+      </div>
     </section>
+    </div>
   </>;
 }
 
-function ResultTable({ result }: { result: Result }) {
+function ResultTable({ result, label }: { result: DataResult; label: string }) {
   const columns = result.preview_rows.length ? Object.keys(result.preview_rows[0]) : [];
   return <div className="result-table" data-testid="data-result">
+    <h4 className="result-tool-title">{label}</h4>
     <p className="result-count">該当 {result.total_count.toLocaleString("ja-JP")}
       {result.count_unit === "groups" ? "グループ" : "件"}
       <span className="small-note"> · {result.preview_rows.length}行を表示</span></p>
@@ -150,9 +148,10 @@ export function ExplorationChat() {
       <span className="environment-badge">POC</span>
     </header>
     <div className="introduction">
-      <p className="eyebrow">STRUCTURED DATA EXPLORER</p>
+      <div>
       <h1>データに、聞いてみる。</h1>
       <p className="description">地域や期間、価格の条件を伝えて、不動産データを検索・集計できます。</p>
+      </div>
       <div className="dataset-line"><span className="dataset-tag">合成データ</span>
         <span>360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</span></div>
     </div>
