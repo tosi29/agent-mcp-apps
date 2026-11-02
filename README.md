@@ -73,4 +73,3 @@ APIキーは `agent/.env` にだけ置く。質問・会話履歴・ツール結
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)
 - [agent：接続設定、CLI、ツール、実行制約、自動テスト](agent/README.md)
-- [アーキテクチャの技術検討](agent/TECHNICAL_REVIEW.md)

@@ -81,4 +81,3 @@ npm run build
 - 変更を意味のある小さな単位に分け、日本語のメッセージでコミットする。
 - コミット前に対象差分を確認する。pushはユーザーから依頼された範囲で行い、既存の履歴を強制的に上書きしない。
 - セットアップと現状は [README.md](README.md)、[app/README.md](app/README.md)、[agent/README.md](agent/README.md) を読む。
-- 技術検討と未確認事項は [agent/TECHNICAL_REVIEW.md](agent/TECHNICAL_REVIEW.md)、初回の実API試験は [agent/SAKURA_SMOKE_RESULT.md](agent/SAKURA_SMOKE_RESULT.md) を参照する。

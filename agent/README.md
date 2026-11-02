@@ -170,7 +170,7 @@ Strands/OpenAIプロバイダーに模擬HTTPを接続し、ツール循環、�
 AG-UIでは入力制限・イベント・履歴再送・UIプレビューの非モデル化も対象にする。
 実モデルの回答品質、ブラウザ描画、AWS上の動作は対象外。
 
-## コードと関連資料
+## コード構成
 
 | ファイル | 役割 |
 | --- | --- |
@@ -182,5 +182,3 @@ AG-UIでは入力制限・イベント・履歴再送・UIプレビューの非�
 | `fixture_model.py` | API不要の固定シナリオ |
 
 コードは `src/exploration_agent/` に配置する。
-設計検討は [TECHNICAL_REVIEW.md](TECHNICAL_REVIEW.md)、
-過去の実API試験は [SAKURA_SMOKE_RESULT.md](SAKURA_SMOKE_RESULT.md) を参照。
