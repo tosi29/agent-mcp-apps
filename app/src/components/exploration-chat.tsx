@@ -53,17 +53,17 @@ function ChatWorkspace() {
   return <>
     {error && <div className="error-banner" role="alert">{error}</div>}
     <div className="exploration-workspace">
-    <section className="chat-card" aria-label="データ探索チャット">
+    <section className="chat-card" aria-label="チャット">
       <div className="chat-toolbar">
         <span className="toolbar-label"><span className={`status-dot ${isReady ? "connected" : ""}`} />
-          {isReady ? "探索チャット" : "接続を準備中"}</span>
-        <span className="session-note">履歴は一時保存・再起動でリセット</span>
+          {isReady ? "チャット" : "接続を準備中"}</span>
       </div>
       <CopilotChat
         agentId="explorer"
         className="explorer-chat"
         inspectorTools={false}
         welcomeScreen={false}
+        input={{ showDisclaimer: false }}
         labels={{
           chatInputPlaceholder: "例：新宿区を年別に集計して、件数と平均取引総額を教えて",
           chatInputToolbarSendButtonLabel: "送信",
@@ -73,22 +73,20 @@ function ChatWorkspace() {
           userMessageToolbarCopyMessageLabel: "質問をコピー",
           assistantMessageToolbarRegenerateLabel: "再実行",
           userMessageToolbarEditMessageLabel: "質問を編集",
-          chatDisclaimerText: "合成データを使用しています。結果は実際の市場価格を示しません。",
         }}
         onError={() => setError("チャットに接続できません。エージェントの起動状態を確認してください。")}
       />
     </section>
     <section className="result-card" aria-label="ツールの実行結果">
       <div className="result-heading"><h2>ツールの実行結果</h2>
-        <span className="small-note">{runs.length ? `${runs.length}件の質問` : "質問ごとに結果を追加"}</span></div>
+        {runs.length > 0 && <span className="small-note">{runs.length}件の質問</span>}</div>
       <div className="result-history" ref={historyRef} onScroll={event => {
         const panel = event.currentTarget;
         followResults.current = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 48;
       }} tabIndex={0} role="region" aria-label="実行結果の履歴">
       {runs.length === 0 ? <div className="empty-result">
         <span aria-hidden="true" className="table-symbol">▤</span>
-        <p>検索・集計の結果がここに追加されます。</p>
-        <span className="small-note">過去の結果も残して、数値や明細を見比べられます。</span>
+        <p>結果はまだありません。</p>
       </div> : runs.map((run, index) => <article className="result-run" key={run.runId} data-status={run.status}>
         <div className="run-heading">
           <div><span className="run-number">質問 {index + 1}</span><h3>{run.question}</h3></div>
@@ -151,19 +149,11 @@ export function ExplorationChat() {
           title="質問にかかわらず、新宿区の年別集計を実行します。外部APIは使用しません。">Stub APIモード</span>}
       </div>
     </header>
-    <div className="introduction">
-      <div>
-      <h1>データに、聞いてみる。</h1>
-      <p className="description">地域や期間、価格の条件を伝えて、不動産データを検索・集計できます。</p>
-      </div>
-      <div className="dataset-line"><span className="dataset-tag">合成データ</span>
-        <span>360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</span></div>
-    </div>
+    <div className="dataset-line">360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</div>
     {mode === "offline" && <div className="error-banner" role="alert">エージェントに接続できません。接続先の状態を確認してから再読み込みしてください。</div>}
     <CopilotKitProvider runtimeUrl={appPath("/api/copilotkit")} agentId="explorer" useSingleEndpoint={false} enableInspector={false}>
       <ChatWorkspace />
     </CopilotKitProvider>
-    <footer className="site-footer"><span>架空の取引データを使用したプロトタイプです。実際の市場価格を示すものではありません。</span>
-      <span>Strands + AG-UI + CopilotKit</span></footer>
+    <footer className="site-footer">Strands + AG-UI + CopilotKit</footer>
   </main>;
 }
