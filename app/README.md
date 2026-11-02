@@ -1,6 +1,6 @@
 # app — Next.js + CopilotKit
 
-データ探索用のローカルチャット。回答文、ツール実行状況、検索・集計結果を表示する。
+データ探索用のチャット。ローカルまたはWeb Adapterを使うLambdaで動かし、回答文、ツール実行状況、検索・集計結果を表示する。
 Node.jsのバージョンは [../.node-version](../.node-version)、依存関係は
 [package.json](package.json) と [package-lock.json](package-lock.json) で管理する。
 
@@ -11,7 +11,7 @@ Browser / CopilotKit React v2
       → Python /invocations → Strands → さくらAI Engine / DuckDB
 ```
 
-Runtimeはローカルの中継で、CopilotKitのクラウド契約やAPIキーは不要。
+CopilotKit RuntimeはNext.js内で動く。CopilotKitのクラウド契約やAPIキーは不要。
 推論APIキーはPython側にだけ置き、Next.jsやブラウザへ渡さない。
 
 ## 起動
@@ -52,6 +52,25 @@ npm run start
 接続先を変更する場合のみ `.env.example` を `.env.local` にコピーし、`AGENT_URL` を設定する。
 既定値は `http://127.0.0.1:8000/invocations`。localhostまたは127.0.0.1のHTTPだけを許可する。
 
+AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN` を設定する。`AGENT_URL` より優先する。
+東京リージョンのRuntimeに接続し、AWS認証は標準チェーンを使う。Lambdaでは実行ロールから取得する。
+`InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。AWS上のエージェントはfixture専用。
+
+## Lambdaへの配備
+
+[Terraformの配備手順](../terraform/README.md)に従う。API Gatewayが画面とチャットAPIを同じOriginで配信し、
+Web AdapterがHTTPをNext.jsのstandaloneサーバーへ渡す。Next.jsからAgentCoreを直接呼ぶ。
+
+Lambda用ZIPは `Dockerfile.lambda` でLinux ARM64向けにビルドする。Web Adapterのreadiness確認は
+`/api/health` を使い、起動確認でエージェントを実行しない。
+ブラウザ向けURLの接頭辞 `NEXT_PUBLIC_BASE_PATH=/poc` をビルド時に設定する。
+API GatewayがLambdaへ渡すパスからステージ名を除くため、Next.jsのルート自体は `/` に保ち、
+JS/CSSには `assetPrefix`、画面内のAPI・ホームURLには `appPath()` で接頭辞を付ける。
+静的ファイルを `public/` に追加する場合も、画面からの参照に `appPath()` を使う。
+
+`APP_ORIGIN` にはAPI Gatewayの公開Originを設定し、それ以外のOriginからのチャットAPI呼び出しを拒否する。
+ブラウザのアクセス制限はAPI Gatewayの送信元IPポリシーで行う。ユーザーごとの認証は未実装。
+
 ## 画面の確認
 
 質問例：「項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて」
@@ -79,7 +98,13 @@ Pythonをfixtureモード、Next.jsを開発または本番モードで起動し
 npm run smoke
 ```
 
-Next.js RuntimeからPythonツールまでを通し、ストリーム、独立した結果イベント、
+配備先のHTTP経路を確認する場合は、末尾 `/poc/` まで含むURLを指定する。
+
+```sh
+SMOKE_URL=https://example.execute-api.ap-northeast-1.amazonaws.com/poc/ npm run smoke
+```
+
+Next.js RuntimeからPythonツールまでを通し、静的ファイルの取得、ストリーム、独立した結果イベント、
 合成データの期待値、正常終端、テレメトリ無効設定を検査する。
 ブラウザ描画とモデルの推論品質は対象外。
 

@@ -1,13 +1,14 @@
 # 開発エージェント向け指示
 
-このリポジトリは、表形式データを自然言語で検索・集計するローカルPoC。
+このリポジトリは、表形式データを自然言語で検索・集計するPoC。
 ユーザーの最新の明示的な指示を優先し、既に合意した作業範囲について確認を繰り返さない。
 
 ## 構成と採用方針
 
 - `app/`：Next.js・TypeScript・CopilotKitの画面とTypeScript Runtime。構成管理はnpm。
 - `agent/`：Strands Agents・通常のPythonツール・DuckDB・AG-UIサーバー。構成管理はuv。
-- `terraform/`：AgentCore Runtime V2・ECR・IAMとLambda＋API GatewayのIaC。`terraform/lambda/` はNode.jsの中継で、構成管理はnpm。
+- `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
+- Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
 - ADK・MCP Server・MCP Appsは現在の実装範囲に含めない。導入や構成の重要な変更は相談する。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。

@@ -1,59 +1,49 @@
 # Terraform
 
-東京リージョン（`ap-northeast-1`）のECR・IAM実行ロール・AgentCore Runtime V2・Lambda・API Gateway REST APIを定義する。
-Terraform本体はルートの `.terraform-version` と `versions.tf` で1.9.7に固定する。
-AWS providerは6.71.0に固定し、`.terraform.lock.hcl` をコミットする。
-AWS認証は標準の認証情報チェーンを使用する。account ID変数は不要。
-
-RuntimeはAG-UIとIAM認証を使う。コンテナはfixture専用で、さくらAPIは呼ばない。
-`network_mode = "PUBLIC"` はIAM認証を無効にする設定ではない。
+東京リージョン（`ap-northeast-1`）に、ブラウザから使うNext.jsとfixtureエージェントを配置する。
 
 ```text
-署名付きHTTPクライアント
-  → API Gateway Regional REST API /poc/invocations（AWS_IAM）
-    → Lambda Node.js 26 / ARM64 ZIP（response streaming）
+Browser → API Gateway Regional REST API /poc/（送信元IP制限）
+  → Lambda Node.js 26 / ARM64 ZIP
+    → Web Adapter → Next.js / CopilotKit Runtime
       → AgentCore Runtime V2 / AG-UI → Strands fixture → DuckDB
 ```
 
-中継はサーバー間通信向けで、ブラウザ向けCORSや無認証のFunction URLは設定しない。
-Next.jsの接続先はまだローカルPythonのまま。クラウド接続にはNext.js側でのSigV4署名が別途必要。
+Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
+AWS認証は標準の認証情報チェーンを使用し、account ID変数は設けない。
+AgentCoreはfixture専用で、さくらAPIは呼ばない。Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
 
-## ローカル検証
+既存の中継LambdaはNext.jsを起動するLambdaへ更新する。`moved` ブロックでTerraform上のアドレスを移し、
+既存の関数・実行ロール・ロググループ名は維持する。
 
-まずLambdaの依存を導入し、テストとZIPのビルドを行う。
-Node.jsはルートの `.node-version` に合わせる。ビルドには `zip` コマンドも必要。
+## ビルド
+
+Docker、Node.js、npm、Python 3.12、uv、Terraformを用意する。
+Next.jsのZIPはLinux ARM64で作り、Macの `node_modules` は使わない。リポジトリ直下で実行する。
 
 ```sh
-cd terraform/lambda
-npm ci --ignore-scripts
-npm test
-npm run build
-cd ../..
+npm --prefix app run build:lambda
 ```
 
-続いてリポジトリ直下で実行する。`test` はmock providerを使い、AWSへ接続しない。
+Amazon Linux 2023と、ルートの `.node-version` から読み取ったNode.js 26の固定版でビルドする。
+成果物は `app/dist/web.zip`。Next.jsのstandaloneサーバー、必要な依存、静的ファイル、起動スクリプトを含む。
+`.env` はDockerのコンテキストから除外し、ビルド中はAWS認証情報を渡さない。
+ブラウザ向けURLの接頭辞 `/poc` はビルド時に設定する。
+TerraformはビルドやECRへのpushを実行しない。LambdaはZIPのハッシュが変わった場合にコードを更新する。
+
+## 初期セットアップ
+
+最初はイメージダイジェスト未指定でECRとAgentCore用IAMだけを作る。
+`apply` とECRへのpushは、実行前に対象とplanを確認する。
 
 ```sh
 export CHECKPOINT_DISABLE=1
-terraform -chdir=terraform init -backend=false
-terraform -chdir=terraform fmt -check -recursive
-terraform -chdir=terraform validate
-terraform -chdir=terraform test
-```
-
-## 配備
-
-`apply` とECRへのpushはAWSリソース・保存料金に関わる操作。実行前にplanを確認する。
-stateはローカルに保存し、Gitへ含めない。
-
-最初はイメージダイジェスト未指定で、ECRとIAMだけを作成する。
-
-```sh
+terraform -chdir=terraform init
 terraform -chdir=terraform plan -out=bootstrap.tfplan
 terraform -chdir=terraform apply bootstrap.tfplan
 ```
 
-ARM64イメージをビルドしてECRへpushする。
+ARM64エージェントイメージをビルドしてECRへpushし、ダイジェストを取得する。
 
 ```sh
 AGENT_REPO="$(terraform -chdir=terraform output -raw agent_repository_url)"
@@ -61,63 +51,62 @@ AGENT_TAG="$(git rev-parse --short HEAD)"
 aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin "${AGENT_REPO%%/*}"
 docker build --platform linux/arm64 -t "$AGENT_REPO:$AGENT_TAG" agent
 docker push "$AGENT_REPO:$AGENT_TAG"
-```
-
-pushしたイメージのダイジェストを取得する。
-
-```sh
 aws ecr describe-images --region ap-northeast-1 --repository-name agent-mcp-apps/agent --image-ids imageTag="$AGENT_TAG" --query 'imageDetails[0].imageDigest' --output text
 ```
 
-取得した値を `terraform/terraform.tfvars` の `agent_image_digest` に保存する。
-LambdaのZIPもビルドしたうえで、Runtime・Lambda・API Gatewayを作成する。
-既にRuntimeを配備済みの場合は、同じダイジェストを維持して中継を追加する。
-タグではなく `sha256:...` を指定する。tfvarsはGitへ含めない。
+## 設定とapply
 
-```sh
-terraform -chdir=terraform plan -out=runtime.tfplan
-terraform -chdir=terraform apply runtime.tfplan
-terraform -chdir=terraform output -raw agent_runtime_arn
+Git除外対象の `terraform/terraform.tfvars` に、イメージのダイジェストとブラウザを使う端末の送信元CIDRを設定する。
+既存Runtimeを使う場合はイメージダイジェストを維持する。
+
+```hcl
+agent_image_digest   = "sha256:取得した64桁のダイジェスト"
+allowed_source_cidrs = ["自分のグローバルIPv4/32"]
 ```
 
-Terraformはビルド・ECRへのpushを実行しない。Lambdaも `npm run build` で作った
-`lambda/dist/bridge.zip` をアップロードし、そのハッシュが変わった場合にコードを更新する。
-AWS SDKもZIPへ同梱し、Lambda同梱SDKのバージョンには依存しない。
-
-## 中継の動作確認
-
-呼び出し元には、`agent_api_invoke_arn` 出力のARNに対する `execute-api:Invoke` 権限が必要。
-既存ユーザー・ロールへの権限追加はこのTerraformでは行わない。
-fixture用の検証コマンドを、リポジトリ直下から実行する。
+グローバルIPv4は `curl -4 https://checkip.amazonaws.com` 等で確認する。
+VPNやネットワークの変更でIPが変わるとアクセスできなくなる。共有NAT内の他の端末も同じIPになる。
+CIDRが空、全インターネットを許可する `/0`、ZIPが未作成の場合は配備を拒否する。
 
 ```sh
-uv run --project agent --locked python terraform/scripts/smoke_streaming.py
+terraform -chdir=terraform fmt -check -recursive
+terraform -chdir=terraform validate
+terraform -chdir=terraform plan -out=web.tfplan
+terraform -chdir=terraform apply web.tfplan
+terraform -chdir=terraform output -raw web_url
 ```
 
-未署名リクエストが403で拒否されることを確認してから、SigV4署名付きで1回実行する。
-イベントの到着時刻を標準出力へ表示し、逐次受信・ツール2回の成功・独立した結果イベント・
-合成データの期待値・正常終了を検査する。署名・認証情報・会話本文は出力しない。
-Lambda、API Gateway、AgentCoreの利用料金は発生し得る。さくらの推論APIは呼ばない。
-この検証はHTTP経路が対象で、ブラウザ描画やLLMの回答品質は対象外。
+`web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送るとAWS上のfixtureを実行する。
+state、tfvars、plan、ZIP、実行結果はGitに含めない。
 
-## 中継の制約
+## 動作確認
 
-- POST `/poc/invocations` のみ。入力は128KiB・40メッセージまで。AG-UIの詳細な入力検査はPython側で行う。
-- 応答は2MiB、1つのSSEフレームは256K文字まで。結果の大量転送用APIではない。
-- AgentCore呼び出しの自動再試行はしない。runごとに新しいRuntimeセッションを使い、会話はAG-UIメッセージで渡す。
-- 中継は130秒で打ち切り、Lambdaは150秒、API Gatewayは155秒に設定する。途中終了や不正な終端は `RUN_ERROR` に変換する。
-- 開始前の失敗はHTTPエラー、ストリーム開始後の失敗はAG-UIエラーとして返す。上流の例外詳細は返さない。
-- CORSは許可せず、Origin付きのリクエストは拒否する。アクセスにはIAM認証が必要。
-- APIのスロットリングは毎秒1件・バースト2件。厳密な同時実行数や費用の上限ではない。
-- リクエスト本文のトレースは無効。Lambdaログの保持は7日。質問・ツール結果・認証ヘッダーをアプリログへ記録しない。
-- 接続断をLambda側で観測できた場合は上流の通信を中断する。ただしAPI Gatewayでのクライアント切断がLambdaへ通知される保証や、AgentCore内の処理・課金停止の保証はない。
-- 結果ファイルは各Runtimeの一時領域。別runからの取得・永続化は未対応。
+ローカルの起動と型チェックは [app/README.md](../app/README.md) を参照する。
+配備後のHTTP確認は、許可した送信元IPから実行する。以下はリポジトリ直下からのコマンド。
 
-設定とローカルテストだけでは、AWS上のストリーミングや認可の動作確認にはならない。
-apply後に上記のHTTP検証を実行する。
-Runtimeの誤削除を防ぐため `prevent_destroy` を設定している。削除時は明示的に解除してplanを確認する。
-ECRもイメージを残したまま強制削除しない。
+```sh
+WEB_URL="$(terraform -chdir=terraform output -raw web_url)"
+cd app
+SMOKE_URL="$WEB_URL" npm run smoke
+```
 
-仕様：[API GatewayのLambdaストリーミング統合](https://docs.aws.amazon.com/apigateway/latest/developerguide/response-transfer-mode-lambda.html)、
-[Lambdaのストリーミング実装](https://docs.aws.amazon.com/lambda/latest/dg/config-rs-write-functions.html)、
-[RuntimeとエンドポイントのIAM認可](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/resource-based-policies.html)。
+画面・静的ファイル・SSE・独立した結果イベント・合成データの期待値・正常終了を検査する。
+ブラウザの描画確認は別途必要。Lambda、API Gateway、AgentCoreの利用料金は発生し得る。
+
+## 制約
+
+- `/` と `/{proxy+}` を同じLambdaへ中継し、画面・静的ファイル・チャットAPIを同じOriginで配信する。
+- APIのリソースポリシーで指定CIDR以外を明示的に拒否する。OIDCとユーザー単位の認証は未実装。
+- API Gatewayの `STREAM` とWeb Adapterの `response_stream` を併用し、Next.jsの圧縮は無効にする。
+- AgentCore呼び出しは自動再試行せず、runごとに新しいセッションを使う。会話はAG-UIメッセージで渡す。
+- 接続状態は `GetAgentRuntime` のREADY状態で判定する。推論品質を示すものではない。
+- 入力は128KiB、Python側で40メッセージまで。上流SSEは2MiB・1フレーム256K文字まで。
+- AgentCoreへの通信は130秒、Lambdaは150秒、API Gatewayは155秒で制限する。上流の異常終了は `RUN_ERROR` にする。
+- APIは毎秒10件・バースト30件でスロットリングする。静的ファイル取得も対象で、費用の厳密な上限ではない。
+- リクエスト本文のトレースは無効。質問・結果・認証ヘッダーをアプリログへ記録しない。Lambdaログは7日保持。
+- ブラウザの切断がLambdaへ通知されることや、AgentCore内の実行・課金が即時停止することは保証しない。
+- 会話履歴はLambdaプロセスのメモリ内。再起動や別の実行環境への振り分けで保持されない。結果ファイルもRuntimeの一時領域で、別取得・永続化は未実装。
+- Runtimeは `prevent_destroy` を設定し、ECRもイメージを残したまま強制削除しない。
+
+仕様：[Web Adapter ZIP構成](https://aws.github.io/aws-lambda-web-adapter/getting-started/zip-packages.html)、
+[API GatewayのLambdaストリーミング統合](https://docs.aws.amazon.com/apigateway/latest/developerguide/response-transfer-mode-lambda.html)。

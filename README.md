@@ -1,8 +1,9 @@
 # 構造化データ探索エージェント PoC
 
-自然言語で表形式データを検索・集計するローカルPoC。
+自然言語で表形式データを検索・集計するPoC。
 Strands AgentsがPythonツールを呼び、DuckDBでParquetを読み取る。
 Next.jsのチャットに回答を逐次表示し、検索・集計結果を別のイベントで届ける。
+クラウドではAPI GatewayからWeb Adapter＋Next.jsのLambdaへ接続し、Next.jsがAgentCoreを呼び出す。
 
 ```text
 Browser / Next.js + CopilotKit
@@ -15,7 +16,7 @@ Browser / Next.js + CopilotKit
 | --- | --- |
 | `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
 | `agent/` | PythonのCLI・AG-UIサーバー、検索・集計ツール。uvで管理 |
-| `terraform/` | AgentCore Runtime V2・ECR・IAMと、Lambda＋API Gatewayのストリーミング中継 |
+| `terraform/` | AgentCore Runtime V2・ECR・IAMと、API Gateway＋Web Adapter＋Next.jsのLambda配備 |
 
 ## セットアップ
 
@@ -68,7 +69,7 @@ APIキーは `agent/.env` にだけ置く。質問・会話履歴・ツール結
 ## 制約と詳細
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
-ローカル単独利用を前提とし、モデルから任意SQLは受け付けない。AWS向け構成はfixture検証用。
+モデルから任意SQLは受け付けない。AWS向け構成はfixture検証用で、送信元IPを制限する。
 結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)

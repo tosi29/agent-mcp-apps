@@ -1,0 +1,16 @@
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-bookworm-slim AS node
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS build
+COPY --from=node /usr/local/ /usr/local/
+ENV NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1
+WORKDIR /build
+RUN dnf install -y zip libstdc++ libatomic && dnf clean all
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --ignore-scripts --no-audit --no-fund && npm cache clean --force
+COPY . .
+ARG NEXT_PUBLIC_BASE_PATH=/poc
+ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+RUN npm run build && npm run package:lambda && rm -rf .next node_modules
+
+FROM scratch AS artifact
+COPY --from=build /build/dist/web.zip /web.zip

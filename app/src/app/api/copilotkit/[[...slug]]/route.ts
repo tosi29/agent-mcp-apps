@@ -1,17 +1,16 @@
-import { HttpAgent } from "@ag-ui/client";
 import {
   CopilotRuntime,
   createCopilotRuntimeHandler,
   InMemoryAgentRunner,
 } from "@copilotkit/runtime/v2";
-import { agentUrl, allowedOrigin } from "../../../../lib/backend";
+import { backendAgent, allowedOrigin } from "../../../../lib/backend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const copilot = new CopilotRuntime({
   agents: {
-    explorer: new HttpAgent({ url: agentUrl().toString() }),
+    explorer: backendAgent(),
   },
   runner: new InMemoryAgentRunner({ maxThreads: 10, maxRunsPerThread: 5, maxBytes: 8_000_000 }),
 });

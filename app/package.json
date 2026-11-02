@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next dev --hostname 127.0.0.1",
-    "build": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next build",
-    "start": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next start --hostname 127.0.0.1",
+    "build": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next build && node scripts/prepare-standalone.mjs",
+    "start": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 HOSTNAME=127.0.0.1 node .next/standalone/server.js",
     "typecheck": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next typegen && tsc --noEmit",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "package:lambda": "node scripts/package-lambda.mjs",
+    "build:lambda": "node scripts/build-lambda.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "3.1161.0",
+    "@aws-sdk/client-bedrock-agentcore-control": "3.1161.0",
     "@ag-ui/client": "1.0.3",
     "@copilotkit/react-core": "1.83.0",
     "@copilotkit/runtime": "1.83.0",

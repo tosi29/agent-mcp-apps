@@ -1,16 +1,14 @@
-import { agentUrl, allowedOrigin } from "../../../lib/backend";
+import { backendStatus, allowedOrigin } from "../../../lib/backend";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!allowedOrigin(request)) {
     return Response.json({ error: "origin not allowed" }, { status: 403 });
   }
   try {
-    const response = await fetch(new URL("/ping", agentUrl()), {
-      cache: "no-store", signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) throw new Error("backend unavailable");
-    const status = await response.json();
-    return Response.json({ mode: status.mode, connected: true });
+    const status = await backendStatus();
+    return Response.json(status, { status: status.connected ? 200 : 503 });
   } catch {
     return Response.json({ connected: false }, { status: 503 });
   }

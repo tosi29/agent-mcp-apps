@@ -1,0 +1,16 @@
+*
+!Dockerfile.lambda
+!package.json
+!package-lock.json
+!.npmrc
+!next.config.ts
+!tsconfig.json
+!src/
+!src/**
+!public/
+!public/**
+!lambda/
+!lambda/run.sh
+!scripts/
+!scripts/package-lambda.mjs
+!scripts/prepare-standalone.mjs

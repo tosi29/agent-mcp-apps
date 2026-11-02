@@ -1,3 +1,6 @@
 # 初回は未指定でECRとIAMを作成する。
 # イメージをpush後、取得したダイジェストをterraform.tfvarsに保存する。
 # agent_image_digest = "sha256:..."
+
+# ブラウザを使う端末のグローバルIP（例示用アドレス。自分の値に置き換える）。
+# allowed_source_cidrs = ["203.0.113.10/32"]
