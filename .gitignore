@@ -13,6 +13,8 @@ agent/data/
 agent/results/
 .next/
 node_modules/
+*.tsbuildinfo
+next-env.d.ts
 .terraform/
 *.tfstate
 *.tfstate.*
