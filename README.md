@@ -1,56 +1,47 @@
 # 構造化データ探索エージェント PoC
 
-Strands Agents + さくらAI Engine + 通常のPythonツール + DuckDBで、
-自然言語によるデータ探索を検証する。Pythonの構成管理は **uv**。
+自然言語で表形式データを検索・集計するローカルPoC。
+Strands AgentsがPythonツールを呼び、DuckDBでParquetを読み取る。
+Next.jsのチャットに回答を逐次表示し、検索・集計結果を別のイベントで届ける。
 
 ```text
-app/        Next.js + CopilotKit チャット、TypeScript Runtime、AG-UI接続
-agent/      PythonのCLI / AG-UIサーバー、uv.lock、自動テスト、技術調査
-terraform/  AWS IaC 用（現在は配置先のみ。リソース未作成）
+Browser / Next.js + CopilotKit
+  → AG-UI / FastAPI
+    → Strands Agents → さくらAI Engine
+      └─ Pythonツール → DuckDB → ローカルParquet
 ```
 
-調査開始時は空ディレクトリで、既存コード・IaC・Git管理はなかった。
-ADK・MCP Server・MCP Appsは実装していない。
+| ディレクトリ | 役割 |
+| --- | --- |
+| `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
+| `agent/` | PythonのCLI・AG-UIサーバー、検索・集計ツール。uvで管理 |
+| `terraform/` | 将来のAWS IaC配置先。未実装 |
 
-## 現在できること
+## セットアップ
 
-- 架空の不動産取引360行を再現可能なParquetとして生成し、DuckDBでスキーマ確認・検索・集計。
-- Strandsの通常のPythonツールとして登録し、さくら向け `OpenAIModel` に接続するCLI。
-- テキスト・ツール開始/終了・構造化結果を独立イベントとしてJSONLまたはSSE形式で標準出力。
-- LLMへ返す最大3行のサンプルと、UI用最大20行のプレビュー、最大200行の保存結果を分離。
-- 外部HTTPを模擬した、実際のStrandsとOpenAIプロバイダーを通るローカル自動テスト。
-- Next.js + CopilotKitからAG-UI経由で質問し、文章と進捗・結果表を別に表示する画面。
-- `ag-ui-strands` によるローカルFastAPIサーバーと、外部API不要の固定シナリオ検証モード。
-
-**さくら実環境では `preview/Kimi-K2.7-Code` で認証・モデル応答・tool calling + streamingが1質問成功。**
-`gpt-oss-120b` は未検証。結果と測定条件は [agent/SAKURA_SMOKE_RESULT.md](agent/SAKURA_SMOKE_RESULT.md) を参照。
-Next.js → CopilotKit Runtime → Python AG-UI → さくら → DuckDB のHTTP経路も、
-別の1質問で3モデル呼び出し・2ツール実行・エラー0を確認した。
-ブラウザの自動画面操作は許可されず、描画の自動検証は未実施。AWS配備も未実装。
-CLIの `--sse` は標準出力の形式であり、ブラウザまでのストリーミングを証明しない。
-
-## ローカルで実行
+Node.js（[.node-version](.node-version) のバージョン）、npm、Python 3.12、uvを用意する。
+リポジトリ直下から実行する。
 
 ```sh
 cd agent
 uv sync --locked
-uv run explore prepare-sample
-uv run explore inspect
-uv run explore query-demo
-uv run pytest -q
-uv run ruff check src tests
-uv run ruff format --check src tests
+uv run --locked explore prepare-sample
+cd ../app
+npm ci --ignore-scripts
+cd ..
 ```
 
-この範囲はキー不要・推論API呼び出しなし。
-`prepare-sample` は既存ファイルを上書きしないため、2回目以降は省略する。
+`prepare-sample` は架空の不動産取引360行を生成する。生成済みなら省略する。
+地域名は実在するが、価格・面積・時期は架空であり、市場価格の判断には使えない。
 
-チャット画面は次の2プロセスで起動する（各ディレクトリで依存導入済みの場合）:
+## チャットを起動する
+
+それぞれリポジトリ直下から、別々のターミナルで実行する。
 
 ```sh
-# ターミナル1
+# ターミナル1：外部API不要の接続検証モード
 cd agent
-uv run --locked --env-file .env explore-server
+uv run --locked explore-server --model fixture
 ```
 
 ```sh
@@ -59,11 +50,27 @@ cd app
 npm run dev
 ```
 
-<http://127.0.0.1:3000> を開く。APIなしの場合はPython側に `--model fixture` を指定する。
-APIキーは `agent/.env` にだけ設定する。Node側のtelemetryはnpmスクリプトで無効化する。
-詳しい初期セットアップ・画面/HTTP検証・telemetryは [app/README.md](app/README.md)、
-さくらの設定とCLI疎通手順は [agent/README.md](agent/README.md) を参照。
-公式仕様・実現性・未検証リスク・今後の実装順は
-[agent/TECHNICAL_REVIEW.md](agent/TECHNICAL_REVIEW.md) に記録している。
+<http://127.0.0.1:3000> を開く。終了は各ターミナルでCtrl+C。
+fixtureモードは質問内容にかかわらず新宿区の年別集計を実行する固定シナリオで、
+自然言語の理解やモデルの回答品質を検証するものではない。
 
-クラウド作成・有料API利用・公開、データセットやUI等の重要な設計変更は事前相談する。
+さくらAI Engineで質問する場合は、[agentの接続設定](agent/README.md#さくらai-engineへの接続)を行い、
+ターミナル1を次のコマンドに置き換える。
+
+```sh
+cd agent
+uv run --locked --env-file .env explore-server
+```
+
+APIキーは `agent/.env` にだけ置く。質問・会話履歴・ツール結果の要約が推論APIへ送られる。
+モデルの利用可否・無償枠は利用者のアカウントで確認する。
+
+## 制約と詳細
+
+対象はローカルの合成Parquet。実データ取り込み、S3対応、AWS配備、認証・会話の永続化は未実装。
+ローカル単独利用を前提とし、モデルから任意SQLは受け付けない。
+結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
+
+- [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)
+- [agent：接続設定、CLI、ツール、実行制約、自動テスト](agent/README.md)
+- [アーキテクチャの技術検討](agent/TECHNICAL_REVIEW.md)
