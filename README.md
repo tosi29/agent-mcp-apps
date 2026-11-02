@@ -15,7 +15,7 @@ Browser / Next.js + CopilotKit
 | --- | --- |
 | `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
 | `agent/` | PythonのCLI・AG-UIサーバー、検索・集計ツール。uvで管理 |
-| `terraform/` | AgentCore Runtime V2・ECR・IAMのIaC |
+| `terraform/` | AgentCore Runtime V2・ECR・IAMと、Lambda＋API Gatewayのストリーミング中継 |
 
 ## セットアップ
 

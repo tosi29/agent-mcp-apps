@@ -1,0 +1,17 @@
+{
+  "name": "agent-streaming-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "26.x" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "3.1161.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
