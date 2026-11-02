@@ -12,6 +12,8 @@ src/exploration_agent/
   results.py    上限付き結果保存、UI用プレビュー、LLM用要約
   runtime.py    通常のPythonツール、Strandsフック、イベント変換、さくらモデル設定
   cli.py        ローカル操作とJSONL/SSE出力
+  server.py     ローカルFastAPI / AG-UI、リクエスト制約、独立した結果イベント
+  fixture_model.py  API不要の固定シナリオ（自然言語推論はしない）
 tests/          DuckDB実行、結果分離、実SDK + 模擬HTTPでの結合テスト
 ```
 
@@ -154,7 +156,7 @@ SQL実行は5秒で `interrupt()` する。
 
 ## 自動テストの範囲
 
-初回実装で16テスト成功。DuckDBの値・0件・上限・不正入力・並行接続、
+現在22テスト成功（初回CLI16件、AG-UI関連6件）。DuckDBの値・0件・上限・不正入力・並行接続、
 許可外ファイルアクセスの拒否、SQL中断、結果の3/20/200行分離を確認。
 実Strands + 実OpenAIプロバイダー + 模擬HTTPで、ストリーミング/非stream両方の
 ツール循環、分割されたツール引数、429、呼び出し上限、タイムアウト、
@@ -163,3 +165,35 @@ SQL実行は5秒で `interrupt()` する。
 
 これらはさくらの実レスポンス、モデルのツール選択精度、ネットワークの遅延、
 ブラウザやAWS中継のバッファリングを検証したものではない。
+
+## AG-UIサーバー
+
+```sh
+uv run --locked --env-file .env explore-server
+# APIなしの検証用
+uv run --locked explore-server --model fixture
+```
+
+127.0.0.1:8000 の `GET /ping`、`POST /invocations` を提供する。
+`ag-ui-strands==1.0.2` / `ag-ui-protocol==1.0.0` / FastAPI 0.162.0 / uvicorn 0.54.0。
+Strands本体ではなくAG-UIプロジェクトが保守する統合パッケージを使う。
+
+標準AG-UI入力の会話を受け付け、毎回新しいAgentと最大4モデル呼び出しの予算を作る。
+Next.jsが一時保持した会話をリプレイする。クライアントのsystem/developerメッセージ、
+ファイル入力、クライアント定義ツール、共有stateや任意のforwardedPropsは採用しない。
+初期PoCは同時1runのみ。処理中の追加リクエストは429、全体120秒上限。
+
+`RequestHooks` はAG-UIラッパーに渡す。テンプレートAgentだけに設定しても
+アダプターが生成するAgentへフックが引き継がれないため。
+アダプターの `ToolBehavior.custom_result_handler` で、ツール本体が保存したプレビューを
+`CUSTOM data_result` として出す。ツールの戻り値と会話スナップショットには最大3行だけを残す。
+実行完了は `CUSTOM tool_status`、回数は `CUSTOM run_metrics` で観測する。
+
+FastAPIネイティブのOpenTelemetry自動設定・トレース・メトリクス・ログ記録は無効化した。
+Strandsの外部トレースexporterはこのアプリから設定していない。
+ライブラリログは起動時に抑止する。HTTPイベントはブラウザへ届けるための別経路。
+
+AG-UIのHTTPテストでは型付き入力/終端、ツール実行、3/20行分離、
+クライアントstateの非モデル化、入力/Origin拒否、呼び出し上限、タイムアウト、
+後続質問での履歴の単一リプレイを確認している。
+Next.js側の実行手順と実API経路の測定は [../app/README.md](../app/README.md) を参照。

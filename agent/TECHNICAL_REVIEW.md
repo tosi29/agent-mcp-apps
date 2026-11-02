@@ -3,6 +3,14 @@
 調査日: 2026-11-02。公式仕様とローカル実行を区別する。
 作業先は空で、既存アプリ・IaC・README・AGENTS.md・Git管理はなかった。
 
+同日追記: ユーザーと相談し、画面はNext.js + CopilotKit、通信はAG-UIに決定。
+独自イベントの直接接続案から、`ag-ui-strands==1.0.2` のFastAPIサーバーへ変更した。
+DuckDB/LLM投影を再利用し、UIプレビューはAG-UIの `CUSTOM data_result` で配送する。
+Next.js HTTP経路の実API試験は1質問・3モデル呼び出しで成功。ブラウザ描画自動検証とAWSは未検証。
+手順・測定範囲は [../app/README.md](../app/README.md)、
+統合の根拠は [Strands公式のAG-UIガイド](https://strandsagents.com/docs/community/integrations/ag-ui/) と
+[AG-UI実装](https://github.com/ag-ui-protocol/ag-ui/tree/main/integrations/aws-strands/python)。
+
 ## 判断
 
 **ローカル構成を実装し、さくら実環境でツール実行・集計・ストリーミング回答が1質問成功した。**
@@ -90,14 +98,14 @@ NYCの根拠:
    モデル向けの投影内容はローカル実SDKの模擬HTTPテストで確認し、実APIへの送信本文は保存していない。
    非stream比較や追加モデル/質問の実API評価は、次の実施範囲を相談してから行う。
 3. **相談して進める:** 国交省データの小サンプルを取得・正規化。列マッピング・出典表示・単位・欠損/丸めを確定。
-4. **別の判断ゲート:** `app/` のNext.js UIとローカルHTTP/SSEアダプター。
-   assistant-ui / AI SDK / 薄い独自UIを現行仕様で比較する。旧ADKアダプターは選定根拠にしない。
-   必要ならUIを先にローカルで作って、クラウドより先にイベント統合を試す案を提案する。
+4. **実装・HTTP検証済み:** ユーザー了承のうえ `app/` にNext.js + CopilotKit v2、
+   `agent/` にag-ui-strands + FastAPIを実装。旧ADKアダプターには依存していない。
+   ローカルHTTPのfixture/実API疎通とproduction buildは成功。ブラウザの自動操作は許可されず未実施。
 5. **承認後のみ:** アカウント/リージョン/認証/費用とTerraform providerのV2対応を確認し、
    `terraform/` でAgentCore V2、次にREST API/Lambda bridgeを作る。復元とS3の測定を行う。
 6. **任意:** Skills、Bedrock比較、評価セット。Bedrock呼び出しは別途課金承認が必要。
 
-S3配置、永続セッション、認証製品、UIライブラリ、Lambda言語、AWSアカウント/リージョン、
+S3配置、永続セッション、認証製品、Lambda言語、AWSアカウント/リージョン、
 HTTP結果取得APIは未確定。初期CLIでは1質問ごとにAgent・状態を作り、将来の複数ユーザーの
 状態共有や復元を実装済みと扱わない。MCP化は検索ロジックを包む将来の選択肢であり、
 今回そのサーバーやMCP Appsを実装する予定はない。
