@@ -1,0 +1,22 @@
+version: 2
+
+# npmとuvのバージョン更新を1つのPRにまとめる。
+# セキュリティ更新は、このグループとは別にPRが作られる場合がある。
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/app"
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
+
+  - package-ecosystem: "uv"
+    directory: "/agent"
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
