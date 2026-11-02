@@ -145,7 +145,11 @@ export function ExplorationChat() {
   return <main className="page-shell">
     <header className="site-header">
       <a className="brand" href={appPath("/")} aria-label="データ探索室 ホーム"><span className="brand-mark" aria-hidden="true">▦</span>データ探索室</a>
-      <span className="environment-badge">POC</span>
+      <div className="header-badges">
+        <span className="environment-badge">POC</span>
+        {mode === "fixture" && <span className="stub-badge"
+          title="質問にかかわらず、新宿区の年別集計を実行します。外部APIは使用しません。">Stub APIモード</span>}
+      </div>
     </header>
     <div className="introduction">
       <div>
@@ -155,7 +159,6 @@ export function ExplorationChat() {
       <div className="dataset-line"><span className="dataset-tag">合成データ</span>
         <span>360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</span></div>
     </div>
-    {mode === "fixture" && <div className="mode-banner">接続検証モード：質問にかかわらず、新宿区の年別集計を実行します。外部APIは使用しません。</div>}
     {mode === "offline" && <div className="error-banner" role="alert">エージェントに接続できません。接続先の状態を確認してから再読み込みしてください。</div>}
     <CopilotKitProvider runtimeUrl={appPath("/api/copilotkit")} agentId="explorer" useSingleEndpoint={false} enableInspector={false}>
       <ChatWorkspace />
