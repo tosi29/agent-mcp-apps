@@ -39,11 +39,9 @@ def ssm(monkeypatch):
 
 
 async def test_key_is_read_after_snapshot_per_run_without_changing_environment(
-    ssm, parquet, tmp_path, monkeypatch
+    ssm, tmp_path, monkeypatch
 ):
     stub, sessions = ssm
-    monkeypatch.setenv("EXPLORER_DATA_PATH", str(parquet))
-    monkeypatch.setenv("EXPLORER_RESULTS_DIR", str(tmp_path / "results"))
     monkeypatch.setenv("SAKURA_API_KEY", "local-environment-must-not-change")
     keys = []
 
@@ -97,8 +95,7 @@ def test_invalid_parameter_fails_without_leaking_key(ssm, kind):
     assert "private-test-key" not in str(error.value)
 
 
-def test_sakura_mode_cannot_silently_fall_back_to_fixture(parquet, monkeypatch):
-    monkeypatch.setenv("EXPLORER_DATA_PATH", str(parquet))
+def test_sakura_mode_cannot_silently_fall_back_to_fixture(monkeypatch):
     monkeypatch.setenv("EXPLORER_MODEL_MODE", "sakura")
     monkeypatch.delenv("SAKURA_API_KEY_PARAMETER_NAME", raising=False)
     with pytest.raises(ValueError, match="SAKURA_API_KEY_PARAMETER_NAME"):

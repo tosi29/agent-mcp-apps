@@ -77,11 +77,11 @@ async def runtime_transport(arn: str):
             yield streams
 
 
-def runtime_client(arn: str) -> MCPClient:
+def runtime_client(arn: str, *, allowed_tools: list[str]) -> MCPClient:
     # Validate before creating a worker or resolving credentials.
     runtime_url(arn)
     return MCPClient(
         lambda: runtime_transport(arn),
         startup_timeout=60,
-        tool_filters={"allowed": ["compare_values"]},
+        tool_filters={"allowed": allowed_tools},
     )

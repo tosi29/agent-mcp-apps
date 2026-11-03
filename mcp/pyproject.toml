@@ -3,7 +3,7 @@ name = "exploration-mcp"
 version = "0.1.0"
 description = "Local and AgentCore MCP tools for the data explorer"
 requires-python = ">=3.12,<3.13"
-dependencies = ["mcp==2.3.0", "starlette==1.10.0", "uvicorn==0.54.0"]
+dependencies = ["duckdb==2.0.0", "mcp==2.3.0", "starlette==1.10.0", "uvicorn==0.54.0"]
 
 [dependency-groups]
 dev = ["httpx==0.28.1", "pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "ruff==0.17.3"]

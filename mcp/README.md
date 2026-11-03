@@ -1,24 +1,66 @@
 # MCPツール
 
-独立したPython・uvプロジェクト。公式MCP Python SDKで `compare_values` を公開する。
-既存のDuckDBツールは `agent/` に残し、このサーバーでは数値の比較だけを行う。
+独立したPython・uvプロジェクト。公式MCP Python SDKで次の4ツールを公開する。
 
-## 起動
+| ツール | 機能 |
+| --- | --- |
+| `describe_dataset` | データ項目・単位・地域候補・件数の確認 |
+| `search_transactions` | 地域の完全一致・年・価格範囲で検索 |
+| `aggregate_transactions` | 地域・年・四半期で件数・価格の平均／最小／最大を集計 |
+| `compare_values` | 2数値の差分・増減率を計算 |
+
+DuckDB・Parquet・結果ファイルはこのプロジェクトが管理する。Strandsには依存しない。
+
+## ローカル起動
 
 以下の `cd` はリポジトリ直下を起点にする。
 
 ```sh
 cd mcp
 uv sync --locked
+uv run --locked explore-mcp prepare-sample
 uv run --locked explore-mcp
 ```
 
 接続先は `http://127.0.0.1:8001/mcp`。Streamable HTTPを使い、各リクエストには単一のJSONで応答する。
 SSEの購読や永続セッションは使わない。ポートは `--port` で変更できる。
-APIキーは不要で、外部API・LLM・データベースには接続しない。
+APIキーとモデルAPIは不要。DuckDBで信頼済みのローカルParquetを検索する。
+`prepare-sample` は360行の架空取引を `mcp/data/synthetic.parquet` に生成する。生成済みなら省略する。
+地域は千代田区・新宿区・渋谷区、期間は2023〜2025年。価格・面積・時期は架空で、市場価格の判断に使えない。
+`--data`／`MCP_DATA_PATH` はサーバー管理者が設定し、ツール引数にはパスを受け付けない。
 このコマンドはループバック限定・認証なしのローカル検証用。
 
-## ツール
+## 検索と結果の制約
+
+検索は `municipality / year / min_price_yen / max_price_yen` を使う。
+列は `transaction_id / municipality / year / quarter / price_yen / area_m2`。
+地域はNFKC正規化・前後空白除去後の完全一致。複数キーワード・部分一致モードは未実装。
+集計単位は `municipality / year / quarter` の許可リストから選ぶ。
+
+DuckDBのRelational API・Expression APIで条件を構築し、任意SQL・列・テーブル・パスを受け付けない。
+各操作で接続を作り直し、信頼済みParquet以外の外部アクセス・拡張の自動取得を禁止する。
+制約は取得最大200行・5秒・256MB・1スレッド。OSレベルの隔離を保証する制約ではない。
+
+検索・集計の戻り値は明示的な `CallToolResult` で分離する。
+
+- `content`：件数・要約・最大3行のサンプル。
+- `structuredContent`：結果ID・件数・最大20行の画面用プレビュー。
+- 保存ファイル：上限200行の結果。ローカルは `results/`、AgentCoreは `/tmp/results`。
+
+単純な辞書の自動変換で表示用データを `content` に重複させない。
+エージェント側は表示用データをAG-UIへ投影した後、会話状態から除去する。
+保存結果は一時ファイルで、Runtimeセッションをまたぐ保持を保証しない。
+全量を取得するWeb APIやMCPリソースは未実装。
+
+以下は `mcp/` で実行する。結果IDは同じMCP環境で保存したものに限る。
+
+```sh
+uv run --locked explore-mcp inspect
+uv run --locked explore-mcp query-demo
+uv run --locked explore-mcp result 結果ID
+```
+
+## 数値比較
 
 `compare_values(baseline, current)` に同じ単位の数値を渡す。
 
@@ -51,7 +93,7 @@ MCP接続先を指定しないエージェントはMCPに接続しない。
 
 ## AgentCoreへの配備
 
-`Dockerfile` はAgentCore向けのARM64コンテナを作る。専用のエントリーポイントは
+`Dockerfile` は合成ParquetとDuckDBを含むAgentCore向けのARM64コンテナを作る。専用のエントリーポイントは
 `0.0.0.0:8000/mcp` と `GET /ping` を提供する。ローカル起動の設定とは分けている。
 
 ```sh
@@ -85,7 +127,7 @@ IAM署名は各HTTPリクエストで生成し、一時認証情報も都度取�
 接続ごとに新しいセッションIDを使い、AgentCoreから返る `Mcp-Session-Id` を後続リクエストへ引き継ぐ。
 署名先はARNから組み立てた東京のエンドポイントに固定し、HTTPリダイレクトを追跡しない。
 
-ローカルテストはコンテナ起動と模擬AWS入口での署名・ツール実行を確認する。
+ローカルテストはMCP実通信と模擬AWS入口での署名・ツール実行を確認する。
 実際のIAM認可、V2復元後の動作、クラウドの遅延は、配備後に別途確認が必要。
 
 仕様：[AgentCore MCP契約](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp-protocol-contract.html)、
@@ -101,5 +143,5 @@ uv run --locked ruff format --check src tests
 uv run --locked pytest -q
 ```
 
-HTTPテストはJSON応答・入力エラー・Host/Origin制約を確認する。
+HTTPテストは4ツールの公開・JSON応答・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
 Strandsとの実HTTP接続・AG-UI結果イベント・モデル履歴との分離は `agent/` の `uv run --locked pytest -q` で確認する。

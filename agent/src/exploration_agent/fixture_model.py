@@ -9,7 +9,7 @@ from strands.models.model import Model
 
 
 class FixtureModel(Model):
-    """Inspect and aggregate Shinjuku; optionally compare values through MCP, then answer."""
+    """Demonstrate the ordinary echo tool, or use the MCP exploration tools."""
 
     def __init__(self, *, compare: bool = False):
         self.calls = 0
@@ -32,14 +32,19 @@ class FixtureModel(Model):
             yield {"contentBlockStart": {"start": {}}}
             for text in [
                 "これは推論表示の接続検証用サンプルです。実際のモデルの推論ではありません。",
-                "データ項目を確認してから、新宿区の年別集計を実行します。",
+                "MCPの項目確認・年別集計を実行します。"
+                if self.compare
+                else "Pythonのecho_textを実行します。",
             ]:
                 await asyncio.sleep(0.1)
                 yield {"contentBlockDelta": {"delta": {"reasoningContent": {"text": text}}}}
             yield {"contentBlockStop": {}}
-        if self.calls <= (3 if self.compare else 2):
+        tool_calls = 3 if self.compare else 1
+        if self.calls <= tool_calls:
             name = "describe_dataset" if self.calls == 1 else "aggregate_transactions"
             args = {} if self.calls == 1 else {"municipality": "新宿区", "group_by": "year"}
+            if not self.compare:
+                name, args = "echo_text", {"text": "接続テスト"}
             if self.calls == 3:
                 name = "compare_values"
                 args = {"baseline": 42_500_000, "current": 42_500_000}
@@ -58,14 +63,19 @@ class FixtureModel(Model):
             yield {"messageStop": {"stopReason": "tool_use"}}
         else:
             yield {"contentBlockStart": {"start": {}}}
-            for text in [
-                "これは接続検証用の固定シナリオです。合成データの新宿区を年別に集計しました。\n\n",
-                "| 年 | 件数 | 平均取引総額 |\n|---|---:|---:|\n",
-                "| 2023 | 40 | 42,500,000円 |\n",
-                "| 2024 | 40 | 42,500,000円 |\n",
-                "| 2025 | 40 | 42,500,000円 |\n\n",
-                "実際の不動産取引や市場価格ではありません。",
-            ]:
+            answer = (
+                [
+                    "これは接続検証用の固定シナリオです。合成データの新宿区を年別に集計しました。\n\n",
+                    "| 年 | 件数 | 平均取引総額 |\n|---|---:|---:|\n",
+                    "| 2023 | 40 | 42,500,000円 |\n",
+                    "| 2024 | 40 | 42,500,000円 |\n",
+                    "| 2025 | 40 | 42,500,000円 |\n\n",
+                    "実際の不動産取引や市場価格ではありません。",
+                ]
+                if self.compare
+                else ["通常のPythonツールecho_textを実行しました。", "返り値は「接続テスト」です。"]
+            )
+            for text in answer:
                 await asyncio.sleep(0.1)
                 yield {"contentBlockDelta": {"delta": {"text": text}}}
             if self.compare:

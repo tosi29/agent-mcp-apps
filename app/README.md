@@ -10,7 +10,8 @@ Node.jsのバージョンは [../.node-version](../.node-version)、依存関係
 Browser / CopilotKit React v2
   → Next.js /api/copilotkit/*（CopilotKit TypeScript Runtime v2）
     → HttpAgent / AG-UI SSE
-      → Python /invocations → Strands → さくらAI Engine / DuckDB
+      → Python /invocations → Strands → さくらAI Engine
+                                 → MCPサーバー → DuckDB
 ```
 
 CopilotKit RuntimeはNext.js内で動く。CopilotKitのクラウド契約やAPIキーは不要。
@@ -22,23 +23,29 @@ CopilotKit RuntimeはNext.js内で動く。CopilotKitのクラウド契約やAPI
 以下はそれぞれリポジトリ直下から、別々のターミナルで実行する。
 
 ```sh
-# ターミナル1：外部API不要の固定シナリオ
-cd agent
-uv run --locked explore-server --model fixture
+# ターミナル1：MCPサーバー
+cd mcp
+uv run --locked explore-mcp
 ```
 
 ```sh
-# ターミナル2
+# ターミナル2：モデルAPI不要の固定シナリオ
+cd agent
+uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/mcp
+```
+
+```sh
+# ターミナル3
 cd app
 npm ci --ignore-scripts
 npm run dev
 ```
 
-<http://127.0.0.1:3000> を開く。Pythonは127.0.0.1:8000、Next.jsは127.0.0.1:3000で待ち受ける。
+<http://127.0.0.1:3000> を開く。MCPは127.0.0.1:8001、Pythonは127.0.0.1:8000、Next.jsは127.0.0.1:3000で待ち受ける。
 終了は各ターミナルでCtrl+C。ポートが使用中なら、既存プロセスを確認してから起動する。
 
 さくらを使う場合は、[agentの接続設定](../agent/README.md#さくらai-engineへの接続)を行い、
-ターミナル1のコマンドを `uv run --locked --env-file .env explore-server` に変更する。
+ターミナル2のコマンドを `uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/mcp` に変更する。
 質問送信と実API用の疎通テストは推論APIを呼び出す。
 
 本番ビルドで起動する場合は、開発サーバーを停止し、`app/` で実行する。
@@ -97,7 +104,8 @@ npm test
 npm run build
 ```
 
-Pythonをfixtureモード、Next.jsを開発または本番モードで起動した状態でHTTP疎通を確認する。
+MCPを起動し、Pythonを `--model fixture --mcp-url http://127.0.0.1:8001/mcp`、
+Next.jsを開発または本番モードで起動した状態でHTTP疎通を確認する。
 
 ```sh
 npm run smoke

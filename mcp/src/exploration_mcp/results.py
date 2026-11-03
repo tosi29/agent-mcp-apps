@@ -39,5 +39,5 @@ def model_summary(result: dict[str, Any], result_id: str) -> dict[str, Any]:
         "result_id": result_id,
         "sample_rows": result["rows"][:3],
         "sample_truncated": result["total_count"] > 3,
-        "notice": "合成データ。sample_rowsは全件ではない。参照IDはローカル保存用。",
+        "notice": "合成データ。sample_rowsは全件ではない。参照IDはMCP側の一時保存用。",
     }

@@ -4,8 +4,8 @@ import duckdb
 import pytest
 from duckdb import col, fn
 
-from exploration_agent.data import DataExplorer, Filters
-from exploration_agent.results import ResultStore, model_summary
+from exploration_mcp.data import DataExplorer, Filters
+from exploration_mcp.results import ResultStore, model_summary
 
 
 def test_search_and_grouped_values(parquet):

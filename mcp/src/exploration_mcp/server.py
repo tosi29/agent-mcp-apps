@@ -1,14 +1,19 @@
 """Streamable HTTP server; local and IAM-protected AgentCore entrypoints."""
 
 import argparse
+import json
 import logging
+import os
+from pathlib import Path
 
 import uvicorn
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from exploration_mcp.comparison import compare_values
+from exploration_mcp.data import DataExplorer, Filters, prepare_sample
+from exploration_mcp.results import ResultStore
+from exploration_mcp.tools import register_tools
 
 
 class RejectBrowserOrigin:
@@ -24,9 +29,18 @@ class RejectBrowserOrigin:
         await self.app(scope, receive, send)
 
 
-def create_app(*, agentcore: bool = False):
-    server = MCPServer("exploration-comparison", subscriptions=False, log_level="WARNING")
-    server.tool()(compare_values)
+def create_app(
+    *, agentcore: bool = False, data_path: Path | None = None, results_dir: Path | None = None
+):
+    explorer = DataExplorer(
+        data_path or Path(os.environ.get("MCP_DATA_PATH", "data/synthetic.parquet"))
+    )
+    # Connections are closed before Runtime V2 can capture its startup snapshot.
+    explorer.describe()
+    default_results = "/tmp/results" if agentcore else "results"
+    store = ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
+    server = MCPServer("exploration-tools", subscriptions=False, log_level="WARNING")
+    register_tools(server, explorer, store)
 
     @server.custom_route("/ping", methods=["GET"])
     async def ping(_request):
@@ -56,9 +70,40 @@ def create_agentcore_app():
 def main() -> None:
     parser = argparse.ArgumentParser(description="ローカルMCPツールサーバー")
     parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument(
+        "--data", type=Path, default=Path(os.environ.get("MCP_DATA_PATH", "data/synthetic.parquet"))
+    )
+    parser.add_argument(
+        "--results", type=Path, default=Path(os.environ.get("MCP_RESULTS_DIR", "results"))
+    )
+    commands = parser.add_subparsers(dest="command")
+    commands.add_parser("prepare-sample", help="合成Parquetを生成する（モデルAPI不要）")
+    commands.add_parser("inspect", help="データ項目を確認する（モデルAPI不要）")
+    commands.add_parser("query-demo", help="新宿区を年別集計する（モデルAPI不要）")
+    result = commands.add_parser("result", help="同じMCP環境の保存結果を読む（モデルAPI不要）")
+    result.add_argument("result_id")
     args = parser.parse_args()
+    logging.disable(logging.CRITICAL)
+    if args.command == "prepare-sample":
+        prepare_sample(args.data)
+        print(json.dumps({"row_count": 360, "path": str(args.data), "synthetic": True}))
+        return
+    if args.command:
+        value = (
+            ResultStore(args.results).get(args.result_id)
+            if args.command == "result"
+            else DataExplorer(args.data).describe()
+            if args.command == "inspect"
+            else DataExplorer(args.data).aggregate("year", Filters("新宿区"))
+        )
+        print(json.dumps(value, ensure_ascii=False, allow_nan=False))
+        return
     uvicorn.run(
-        create_app(), host="127.0.0.1", port=args.port, access_log=False, log_level="warning"
+        create_app(data_path=args.data, results_dir=args.results),
+        host="127.0.0.1",
+        port=args.port,
+        access_log=False,
+        log_level="warning",
     )
 
 

@@ -1,7 +1,7 @@
 # 構造化データ探索エージェント PoC
 
 自然言語で表形式データを検索・集計するPoC。
-Strands AgentsがPythonツールを呼び、DuckDBでParquetを読み取る。
+Strands AgentsがMCPの探索ツールを呼び、MCPサーバー内のDuckDBでParquetを読み取る。
 Next.jsのチャットに回答を逐次表示し、検索・集計結果を別のイベントで届ける。
 クラウドではAPI GatewayからWeb Adapter＋Next.jsのLambdaへ接続し、Next.jsがAgentCoreを呼び出す。
 
@@ -9,14 +9,15 @@ Next.jsのチャットに回答を逐次表示し、検索・集計結果を別�
 Browser / Next.js + CopilotKit
   → AG-UI / FastAPI
     → Strands Agents → さくらAI Engine
-      └─ Pythonツール → DuckDB → ローカルParquet
+      ├─ MCPツール → DuckDB → ローカルParquet
+      └─ Pythonツール → echo_text（接続検証サンプル）
 ```
 
 | ディレクトリ | 役割 |
 | --- | --- |
 | `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
-| `agent/` | PythonのCLI・AG-UIサーバー、検索・集計ツール。uvで管理 |
-| `mcp/` | 数値比較MCP。ローカル起動・IAM認証付きAgentCore用の配備設定。uvで管理 |
+| `agent/` | Strands・CLI・AG-UIサーバー、Pythonツールのechoサンプル。uvで管理 |
+| `mcp/` | スキーマ確認・検索・集計・数値比較のMCPとDuckDB。uvで管理 |
 | `terraform/` | AgentCore Runtime V2・ECR・IAMと、API Gateway＋Web Adapter＋Next.jsのLambda配備 |
 
 ## セットアップ
@@ -25,9 +26,11 @@ Node.js（[.node-version](.node-version) のバージョン）、npm、Python 3.
 リポジトリ直下から実行する。
 
 ```sh
-cd agent
+cd mcp
 uv sync --locked
-uv run --locked explore prepare-sample
+uv run --locked explore-mcp prepare-sample
+cd ../agent
+uv sync --locked
 cd ../app
 npm ci --ignore-scripts
 cd ..
@@ -41,13 +44,19 @@ cd ..
 それぞれリポジトリ直下から、別々のターミナルで実行する。
 
 ```sh
-# ターミナル1：外部API不要の接続検証モード
-cd agent
-uv run --locked explore-server --model fixture
+# ターミナル1：MCPサーバー
+cd mcp
+uv run --locked explore-mcp
 ```
 
 ```sh
-# ターミナル2
+# ターミナル2：モデルAPI不要の接続検証モード
+cd agent
+uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/mcp
+```
+
+```sh
+# ターミナル3
 cd app
 npm run dev
 ```
@@ -57,11 +66,11 @@ fixtureモードは質問内容にかかわらず新宿区の年別集計を実�
 自然言語の理解やモデルの回答品質を検証するものではない。
 
 さくらAI Engineで質問する場合は、[agentの接続設定](agent/README.md#さくらai-engineへの接続)を行い、
-ターミナル1を次のコマンドに置き換える。
+ターミナル2を次のコマンドに置き換える。
 
 ```sh
 cd agent
-uv run --locked --env-file .env explore-server
+uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/mcp
 ```
 
 ローカルのAPIキーは `agent/.env` に置く。AWSでは事前作成したParameter StoreのSecureString名を指定する。
@@ -70,12 +79,12 @@ uv run --locked --env-file .env explore-server
 
 ## 制約と詳細
 
-既存のPythonツールに加え、ローカルで任意に接続できるMCPの数値比較ツールがある。
+探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textのみ。
 構成と起動方法は [mcp/README.md](mcp/README.md) を参照。MCP Appsは使用しない。
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。
-結果は最大200行を保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
+結果はMCP側に最大200行を一時保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)
 - [agent：接続設定、CLI、ツール、実行制約、自動テスト](agent/README.md)

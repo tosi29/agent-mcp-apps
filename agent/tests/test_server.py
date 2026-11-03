@@ -30,8 +30,8 @@ def decode_sse(body):
     return [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
 
 
-async def test_http_agui_endpoint_runs_real_tools(parquet, tmp_path):
-    app = create_app(FixtureModel, parquet, tmp_path, mode="fixture")
+async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
+    app = create_app(lambda: FixtureModel(compare=True), mode="fixture", mcp_url=mcp_url)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
@@ -47,10 +47,10 @@ async def test_http_agui_endpoint_runs_real_tools(parquet, tmp_path):
     result = next(e["value"] for e in events if e.get("name") == "data_result")
     assert result["total_count"] == 3
     assert [row["transaction_count"] for row in result["preview_rows"]] == [40] * 3
-    assert next(e["value"] for e in events if e.get("name") == "run_metrics")["model_calls"] == 3
+    assert next(e["value"] for e in events if e.get("name") == "run_metrics")["model_calls"] == 4
 
 
-async def test_preview_and_client_state_never_reach_model(parquet, tmp_path):
+async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
     requests = []
 
     def handle(request):
@@ -84,7 +84,7 @@ async def test_preview_and_client_state_never_reach_model(parquet, tmp_path):
         )
         events = [
             e.model_dump(mode="json", by_alias=True)
-            async for e in agui_events(run, model, parquet, tmp_path)
+            async for e in agui_events(run, model, mcp_url=mcp_url)
         ]
     assert events[-1]["type"] == "RUN_FINISHED", events
     preview = next(e["value"] for e in events if e.get("name") == "data_result")
@@ -102,14 +102,17 @@ async def test_preview_and_client_state_never_reach_model(parquet, tmp_path):
 
 
 @pytest.mark.parametrize("streaming", [True, False])
-async def test_reasoning_reaches_ui_and_followup_excludes_it(parquet, tmp_path, streaming):
+async def test_reasoning_reaches_ui_and_followup_excludes_it(tmp_path, streaming):
     requests = []
     reasoning = "テスト用推論：まずデータの項目を確認します。"
 
     def handle(request):
         requests.append(json.loads(request.content))
         if len(requests) == 1:
-            message = {**tool_message("describe_dataset", {}), "reasoning_content": reasoning}
+            message = {
+                **tool_message("echo_text", {"text": "test"}),
+                "reasoning_content": reasoning,
+            }
             answer = completion(message, "tool_calls")
         else:
             answer = completion({"role": "assistant", "content": "確認しました。"}, "stop")
@@ -122,8 +125,6 @@ async def test_reasoning_reaches_ui_and_followup_excludes_it(parquet, tmp_path, 
     ) as model_client:
         app = create_app(
             lambda: OpenAIModel(client=model_client, model_id="mock", stream=streaming),
-            parquet,
-            tmp_path,
             mode="test",
         )
         async with httpx.AsyncClient(
@@ -159,8 +160,8 @@ async def test_reasoning_reaches_ui_and_followup_excludes_it(parquet, tmp_path, 
     assert "続きを教えて" in json.dumps(requests[-1], ensure_ascii=False)
 
 
-async def test_request_rejection_and_origin_guard(parquet, tmp_path):
-    app = create_app(FixtureModel, parquet, tmp_path, mode="fixture")
+async def test_request_rejection_and_origin_guard(tmp_path):
+    app = create_app(FixtureModel, mode="fixture")
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
@@ -202,14 +203,12 @@ async def test_request_rejection_and_origin_guard(parquet, tmp_path):
         ).status_code == 422
 
 
-async def test_agui_budget_and_error_are_terminal(parquet, tmp_path):
+async def test_agui_budget_and_error_are_terminal(tmp_path):
     events = [
         e.model_dump(mode="json", by_alias=True)
         async for e in agui_events(
             RunAgentInput.model_validate(run_input()),
             FixtureModel(),
-            parquet,
-            tmp_path,
             max_model_calls=1,
         )
     ]
@@ -218,14 +217,12 @@ async def test_agui_budget_and_error_are_terminal(parquet, tmp_path):
     assert "Traceback" not in json.dumps(events)
 
 
-async def test_agui_timeout(parquet, tmp_path):
+async def test_agui_timeout(tmp_path):
     events = [
         e.model_dump(mode="json", by_alias=True)
         async for e in agui_events(
             RunAgentInput.model_validate(run_input()),
             FixtureModel(),
-            parquet,
-            tmp_path,
             timeout_seconds=0.02,
         )
     ]
@@ -233,7 +230,7 @@ async def test_agui_timeout(parquet, tmp_path):
     assert not any(e["type"] == "RUN_FINISHED" for e in events)
 
 
-async def test_followup_replays_history_once_without_preview(parquet, tmp_path):
+async def test_followup_replays_history_once_without_preview(tmp_path):
     requests = []
 
     def handle(request):
@@ -250,8 +247,6 @@ async def test_followup_replays_history_once_without_preview(parquet, tmp_path):
     ) as model_client:
         app = create_app(
             lambda: OpenAIModel(client=model_client, model_id="mock"),
-            parquet,
-            tmp_path,
             mode="test",
         )
         async with httpx.AsyncClient(

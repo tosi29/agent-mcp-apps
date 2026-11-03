@@ -98,7 +98,7 @@ def response(body, streaming):
 
 
 @pytest.mark.parametrize("streaming", [True, False])
-async def test_real_sdk_tool_loop_and_data_separation(parquet, tmp_path, streaming):
+async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_url, mcp_results):
     requests = []
 
     def handle(request):
@@ -122,10 +122,7 @@ async def test_real_sdk_tool_loop_and_data_separation(parquet, tmp_path, streami
     ) as client:
         model = OpenAIModel(client=client, model_id="mock", stream=streaming)
         events = [
-            event
-            async for event in stream_question(
-                "合成データを検索", model, parquet, tmp_path / "results"
-            )
+            event async for event in stream_question("合成データを検索", model, mcp_url=mcp_url)
         ]
     assert len(requests) == 3
     search_spec = next(
@@ -145,9 +142,7 @@ async def test_real_sdk_tool_loop_and_data_separation(parquet, tmp_path, streami
     assert data["tool_call_id"] == "call-search"
     assert len(data["preview_rows"]) == 20
     assert data["total_count"] == 360
-    artifact = json.loads(
-        (tmp_path / "results" / data["request_id"] / f"{data['result_id']}.json").read_text()
-    )
+    artifact = json.loads((mcp_results / f"{data['result_id']}.json").read_text())
     assert len(artifact["rows"]) == 200
     model_result = next(
         m for m in requests[-1]["messages"] if m.get("tool_call_id") == "call-search"
@@ -166,7 +161,7 @@ async def test_real_sdk_tool_loop_and_data_separation(parquet, tmp_path, streami
     assert types.index("data_result") < max(i for i, t in enumerate(types) if t == "tool_end")
 
 
-async def test_provider_error_is_terminal_and_not_leaked(parquet, tmp_path):
+async def test_provider_error_is_terminal_and_not_leaked(tmp_path):
     calls = 0
 
     def handle(request):
@@ -182,10 +177,7 @@ async def test_provider_error_is_terminal_and_not_leaked(parquet, tmp_path):
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
         events = [
-            e
-            async for e in stream_question(
-                "テスト", OpenAIModel(client=client, model_id="mock"), parquet, tmp_path
-            )
+            e async for e in stream_question("テスト", OpenAIModel(client=client, model_id="mock"))
         ]
     assert calls == 1
     assert [e["type"] for e in events] == ["error", "done"]
@@ -193,14 +185,17 @@ async def test_provider_error_is_terminal_and_not_leaked(parquet, tmp_path):
     assert "private-secret" not in json.dumps(events)
 
 
-async def test_model_loop_has_a_hard_call_budget(parquet, tmp_path):
+async def test_model_loop_has_a_hard_call_budget(tmp_path):
     calls = 0
 
     def handle(request):
         nonlocal calls
         calls += 1
         return response(
-            completion(tool_message("describe_dataset", {}, f"call-{calls}"), "tool_calls"), True
+            completion(
+                tool_message("echo_text", {"text": "budget"}, f"call-{calls}"), "tool_calls"
+            ),
+            True,
         )
 
     async with AsyncOpenAI(
@@ -213,8 +208,6 @@ async def test_model_loop_has_a_hard_call_budget(parquet, tmp_path):
             async for e in stream_question(
                 "テスト",
                 OpenAIModel(client=client, model_id="mock"),
-                parquet,
-                tmp_path,
                 max_model_calls=2,
             )
         ]
@@ -222,7 +215,7 @@ async def test_model_loop_has_a_hard_call_budget(parquet, tmp_path):
     assert events[-1]["status"] == "error"
 
 
-async def test_request_timeout(parquet, tmp_path):
+async def test_request_timeout(tmp_path):
     async def handle(request):
         await asyncio.sleep(1)
         return response(completion({"role": "assistant", "content": "unused"}, "stop"), True)
@@ -237,8 +230,6 @@ async def test_request_timeout(parquet, tmp_path):
             async for e in stream_question(
                 "テスト",
                 OpenAIModel(client=client, model_id="mock"),
-                parquet,
-                tmp_path,
                 timeout_seconds=0.01,
             )
         ]
@@ -268,7 +259,7 @@ def test_sse_frame_encoding(capsys):
     assert json.loads(encoded.split("data: ")[1])["text"] == "A\nB"
 
 
-async def test_text_arrives_before_http_stream_finishes(parquet, tmp_path):
+async def test_text_arrives_before_http_stream_finishes(tmp_path):
     finish = asyncio.Event()
 
     class SlowStream(httpx2.AsyncByteStream):
@@ -295,9 +286,7 @@ async def test_text_arrives_before_http_stream_finishes(parquet, tmp_path):
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = stream_question(
-            "テスト", OpenAIModel(client=client, model_id="mock"), parquet, tmp_path
-        )
+        events = stream_question("テスト", OpenAIModel(client=client, model_id="mock"))
         try:
             first = await asyncio.wait_for(anext(events), 2)
             assert first["type"] == "text_delta"
@@ -311,7 +300,7 @@ async def test_text_arrives_before_http_stream_finishes(parquet, tmp_path):
             await events.aclose()
 
 
-async def test_invalid_tool_input_reports_error_without_data(parquet, tmp_path):
+async def test_invalid_tool_input_reports_error_without_data(tmp_path, mcp_url):
     calls = 0
 
     def handle(request):
@@ -332,9 +321,41 @@ async def test_invalid_tool_input_reports_error_without_data(parquet, tmp_path):
         events = [
             event
             async for event in stream_question(
-                "テスト", OpenAIModel(client=client, model_id="mock"), parquet, tmp_path
+                "テスト", OpenAIModel(client=client, model_id="mock"), mcp_url=mcp_url
             )
         ]
     assert not any(e["type"] == "data_result" for e in events)
     assert next(e for e in events if e["type"] == "tool_end")["status"] == "error"
     assert events[-1]["tool_errors"] == 1
+
+
+async def test_ordinary_function_call_sample_works_without_mcp():
+    requests = []
+
+    def handle(request):
+        requests.append(json.loads(request.content))
+        answer = (
+            completion(tool_message("echo_text", {"text": "こんにちは"}), "tool_calls")
+            if len(requests) == 1
+            else completion({"role": "assistant", "content": "返しました。"}, "stop")
+        )
+        return response(answer, True)
+
+    async with AsyncOpenAI(
+        api_key="test-only",
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
+    ) as client:
+        events = [
+            e
+            async for e in stream_question(
+                "こんにちはを返して",
+                OpenAIModel(client=client, model_id="mock"),
+            )
+        ]
+    assert [t["function"]["name"] for t in requests[0]["tools"]] == ["echo_text"]
+    tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
+    assert json.loads(tool_result["content"]) == {"text": "こんにちは"}
+    assert events[-1]["status"] == "success"
+    assert events[-1]["tool_calls"] == 1
+    assert not any(e["type"] == "data_result" for e in events)

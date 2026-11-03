@@ -8,6 +8,7 @@ import { appPath } from "../lib/paths";
 import { resultHistorySubscriber, type DataResult, type ResultRun } from "../lib/result-history";
 
 const toolNames: Record<string, string> = {
+  echo_text: "入力を返す（Pythonサンプル）",
   describe_dataset: "データ項目を確認",
   search_transactions: "条件に合う取引を検索",
   aggregate_transactions: "取引データを集計",
@@ -157,7 +158,7 @@ export function ExplorationChat() {
       <div className="header-badges">
         <span className="environment-badge">POC</span>
         {mode === "fixture" && <span className="stub-badge"
-          title="質問にかかわらず、新宿区の年別集計を実行します。外部APIは使用しません。">Stub APIモード</span>}
+          title="質問にかかわらず固定シナリオを実行します。外部のモデルAPIは使用しません。">Stub APIモード</span>}
       </div>
     </header>
     <div className="dataset-line">360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</div>

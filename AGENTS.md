@@ -6,12 +6,12 @@
 ## 構成と採用方針
 
 - `app/`：Next.js・TypeScript・CopilotKitの画面とTypeScript Runtime。構成管理はnpm。
-- `agent/`：Strands Agents・通常のPythonツール・DuckDB・AG-UIサーバー。構成管理はuv。
-- `mcp/`：既存ツールとは別のMCPサーバー。Python・uvで管理し、ローカルまたはAgentCore上のStreamable HTTPでJSONを返す。
+- `agent/`：Strands Agents・Pythonツールのechoサンプル・AG-UIサーバー。構成管理はuv。
+- `mcp/`：探索4ツールとDuckDB・Parquet・結果保存を持つMCPサーバー。Python・uvで管理し、ローカルまたはAgentCore上のStreamable HTTPでJSONを返す。
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
-- MCP Serverは `mcp/` に分け、エージェントから接続する。既存のDuckDBツールは通常のPythonツールとして維持する。
+- MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルのみ。
 - ADK・MCP Appsは現在の実装範囲に含めない。導入や構成の重要な変更は相談する。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
 

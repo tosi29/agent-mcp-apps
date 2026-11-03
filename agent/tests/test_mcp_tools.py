@@ -1,12 +1,6 @@
 import asyncio
 import json
-import os
-import socket
-import subprocess
-import sys
 import threading
-import time
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -22,53 +16,26 @@ from test_server import decode_sse, run_input
 
 from exploration_agent import agentcore_mcp, mcp_tools
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.mcp_tools import connect_mcp
+from exploration_agent.mcp_tools import MCP_TOOL_NAMES, connect_mcp
 from exploration_agent.server import agui_events, create_app
 
 
-@pytest.fixture(scope="module")
-def mcp_url(unused_tcp_port_factory):
-    port = unused_tcp_port_factory()
-    source = Path(__file__).resolve().parents[2] / "mcp" / "src"
-    process = subprocess.Popen(
-        [sys.executable, "-m", "exploration_mcp.server", "--port", str(port)],
-        env={**os.environ, "PYTHONPATH": str(source)},
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    url = f"http://127.0.0.1:{port}/mcp"
-    try:
-        for _ in range(100):
-            assert process.poll() is None, "MCP server exited during startup"
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                    break
-            except OSError:
-                pass
-            time.sleep(0.05)
-        else:
-            pytest.fail("MCP server did not start")
-        yield url
-    finally:
-        process.terminate()
-        process.wait(timeout=5)
-
-
-async def test_existing_and_mcp_tools_emit_independent_results(mcp_url, parquet, tmp_path):
+async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     events = [
         event.model_dump(mode="json", by_alias=True)
         async for event in agui_events(
             RunAgentInput.model_validate(run_input()),
             FixtureModel(compare=True),
-            parquet,
-            tmp_path,
             mcp_url=mcp_url,
         )
     ]
     assert events[-1]["type"] == "RUN_FINISHED"
     results = [event["value"] for event in events if event.get("name") == "data_result"]
     assert len(results) == 2
+    assert all(result["source"] == "mcp" for result in results)
     assert results[0]["total_count"] == 3
+    assert results[0]["dataset"] == "synthetic-real-estate-v1"
+    assert results[0]["synthetic"] is True
     assert results[1]["source"] == "mcp"
     assert results[1]["preview_rows"] == [
         {
@@ -84,7 +51,7 @@ async def test_existing_and_mcp_tools_emit_independent_results(mcp_url, parquet,
     assert statuses == ["success"] * 3
 
 
-async def test_mcp_preview_is_not_added_to_model_history(mcp_url, parquet, tmp_path):
+async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
     requests = []
 
     def handle(request):
@@ -108,8 +75,6 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, parquet, tmp_p
             async for event in agui_events(
                 RunAgentInput.model_validate(run_input()),
                 OpenAIModel(client=client, model_id="mock"),
-                parquet,
-                tmp_path,
                 mcp_url=mcp_url,
             )
         ]
@@ -128,11 +93,9 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, parquet, tmp_p
     assert "result_id" not in json.dumps(requests)
 
 
-async def test_unavailable_mcp_fails_without_falling_back(parquet, tmp_path, unused_tcp_port):
+async def test_unavailable_mcp_fails_without_falling_back(tmp_path, unused_tcp_port):
     app = create_app(
         FixtureModel,
-        parquet,
-        tmp_path,
         mode="fixture",
         mcp_url=f"http://127.0.0.1:{unused_tcp_port}/mcp",
     )
@@ -239,7 +202,7 @@ async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
     for _ in range(2):
         returned_session = str(uuid4())
         async with connect_mcp(None, runtime_arn=RUNTIME_ARN) as tools:
-            assert [tool.tool_name for tool in tools] == ["compare_values"]
+            assert {tool.tool_name for tool in tools} == set(MCP_TOOL_NAMES)
             # Use the real Strands adapter and MCP server, with only AWS HTTP ingress simulated.
             client = tools[0].mcp_client
             result = await asyncio.to_thread(
@@ -248,7 +211,7 @@ async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
                 "compare_values",
                 {"baseline": 100, "current": 120},
             )
-            assert result["structuredContent"]["percent_change"] == 20
+            assert result["structuredContent"]["preview_rows"][0]["percent_change"] == 20
     assert len(credentials) == len(requests)
     assert len(sessions) == 2
     assert sessions[0] != sessions[1]

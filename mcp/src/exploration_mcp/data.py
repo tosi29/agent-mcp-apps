@@ -1,4 +1,4 @@
-"""SDK-independent, bounded queries over a single trusted local Parquet file."""
+"""SDK-independent DuckDB queries owned by the MCP service."""
 
 from __future__ import annotations
 

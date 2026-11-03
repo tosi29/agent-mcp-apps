@@ -11,7 +11,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
-RUN uv sync --locked --no-dev --no-editable
+RUN uv sync --locked --no-dev --no-editable \
+    && .venv/bin/explore-mcp prepare-sample
 
 USER 10001:10001
 EXPOSE 8000

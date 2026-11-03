@@ -11,6 +11,8 @@ __pycache__/
 .ruff_cache/
 agent/data/
 agent/results/
+mcp/data/
+mcp/results/
 .next/
 node_modules/
 *.tsbuildinfo

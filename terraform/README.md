@@ -6,8 +6,8 @@
 Browser → API Gateway Regional REST API /poc/（送信元IP制限）
   → Lambda Node.js 26 / ARM64 ZIP
     → Web Adapter → Next.js / CopilotKit Runtime
-      → AgentCore Runtime V2 / AG-UI → Strands → DuckDB
-                                       └─ IAM SigV4 → MCP用AgentCore Runtime V2（任意）
+      → AgentCore Runtime V2 / AG-UI → Strands
+          └─ IAM SigV4 → MCP用AgentCore Runtime V2 → DuckDB / Parquet
 ```
 
 Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
@@ -83,7 +83,8 @@ state、tfvars、plan、ZIP、実行結果はGitに含めない。
 
 ## MCPの配備
 
-数値比較MCPはエージェントと別のECR・実行ロール・AgentCore Runtime V2に配置する。
+探索・比較4ツールを持つMCPを、エージェントと別のECR・実行ロール・AgentCore Runtime V2に配置する。
+ParquetはMCPイメージのビルド時に生成し、エージェントには含めない。
 プロトコルは `MCP`、認証はIAM SigV4。CognitoやOAuthのリソースは追加しない。
 `mcp_image_digest` 未指定ならMCP用ECRとIAMのみ作成し、RuntimeやエージェントのMCP接続設定は作らない。
 

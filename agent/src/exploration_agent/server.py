@@ -6,7 +6,6 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from functools import partial
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -21,10 +20,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from strands import Agent
 from strands.models.model import Model
 
-from exploration_agent.data import DataExplorer
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.mcp_tools import ComparisonPreviewHook, connect_mcp
-from exploration_agent.results import ResultStore
+from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
 from exploration_agent.runtime import SYSTEM_PROMPT, RequestHooks, SakuraSettings, build_tools
 
 MAX_BODY_BYTES = 128 * 1024
@@ -34,8 +31,6 @@ ALLOWED_ORIGINS = {"http://127.0.0.1:3000", "http://localhost:3000"}
 async def agui_events(
     run: RunAgentInput,
     model: Model,
-    parquet: Path,
-    results_dir: Path,
     *,
     mcp_url: str | None = None,
     mcp_runtime_arn: str | None = None,
@@ -50,8 +45,6 @@ async def agui_events(
         async for event in _agui_events(
             run,
             model,
-            parquet,
-            results_dir,
             mcp_tools=tools,
             max_model_calls=max_model_calls,
             timeout_seconds=remaining,
@@ -62,8 +55,6 @@ async def agui_events(
 async def _agui_events(
     run: RunAgentInput,
     model: Model,
-    parquet: Path,
-    results_dir: Path,
     *,
     mcp_tools: list,
     max_model_calls: int,
@@ -87,27 +78,22 @@ async def _agui_events(
             yield CustomEvent(type=EventType.CUSTOM, name="tool_status", value=status)
 
     hooks = RequestHooks(observe, max_model_calls)
-    store = ResultStore(results_dir / request_id)
-    explorer = DataExplorer(parquet)
-    await asyncio.to_thread(explorer.describe)
     template = Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=build_tools(explorer, store, observe) + mcp_tools,
+        tools=build_tools() + mcp_tools,
         callback_handler=None,
         retry_strategy=None,
     )
     adapter = StrandsAgent(
         agent=template,
         name="explorer",
-        hooks=[hooks, *([ComparisonPreviewHook(store, observe)] if mcp_tools else [])],
+        hooks=[hooks, MCPPreviewHook(observe)],
         config=StrandsAgentConfig(
             tool_behaviors={
                 name: ToolBehavior(custom_result_handler=custom_result)
                 for name in [
-                    "describe_dataset",
-                    "search_transactions",
-                    "aggregate_transactions",
+                    "echo_text",
                     *(tool.tool_name for tool in mcp_tools),
                 ]
             },
@@ -167,8 +153,6 @@ async def _agui_events(
 
 def create_app(
     model_factory: Callable[[], Model],
-    parquet: Path,
-    results_dir: Path,
     *,
     mode: str,
     mcp_url: str | None = None,
@@ -249,8 +233,6 @@ def create_app(
                 async for event in agui_events(
                     run,
                     model,
-                    parquet,
-                    results_dir,
                     mcp_url=mcp_url,
                     mcp_runtime_arn=mcp_runtime_arn,
                 ):
@@ -294,8 +276,6 @@ def main() -> None:
     mcp = parser.add_mutually_exclusive_group()
     mcp.add_argument("--mcp-url", help="ローカルMCPサーバーのURL（例：http://127.0.0.1:8001/mcp）")
     mcp.add_argument("--mcp-runtime-arn", help="IAM認証で接続する東京のMCP Runtime ARN")
-    parser.add_argument("--data", type=Path, default=Path("data/synthetic.parquet"))
-    parser.add_argument("--results", type=Path, default=Path("results"))
     args = parser.parse_args()
     logging.disable(logging.CRITICAL)
     if args.model == "sakura":
@@ -303,12 +283,9 @@ def main() -> None:
         factory = settings.build_model
     else:
         factory = partial(FixtureModel, compare=bool(args.mcp_url or args.mcp_runtime_arn))
-    DataExplorer(args.data).describe()
     uvicorn.run(
         create_app(
             factory,
-            args.data,
-            args.results,
             mode=args.model,
             mcp_url=args.mcp_url,
             mcp_runtime_arn=args.mcp_runtime_arn,

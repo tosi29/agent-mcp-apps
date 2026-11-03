@@ -12,8 +12,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
 
-RUN uv sync --locked --no-dev --no-editable \
-    && .venv/bin/explore prepare-sample
+RUN uv sync --locked --no-dev --no-editable
 
 USER 10001:10001
 EXPOSE 8080
