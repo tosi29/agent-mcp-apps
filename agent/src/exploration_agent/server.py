@@ -38,10 +38,15 @@ async def agui_events(
     results_dir: Path,
     *,
     mcp_url: str | None = None,
+    mcp_runtime_arn: str | None = None,
     max_model_calls: int = 4,
     timeout_seconds: float = 120,
 ) -> AsyncIterator:
-    async with connect_mcp(mcp_url) as tools:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    async with connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as tools:
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise TimeoutError("MCP connection exceeded the request budget")
         async for event in _agui_events(
             run,
             model,
@@ -49,7 +54,7 @@ async def agui_events(
             results_dir,
             mcp_tools=tools,
             max_model_calls=max_model_calls,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=remaining,
         ):
             yield event
 
@@ -167,6 +172,7 @@ def create_app(
     *,
     mode: str,
     mcp_url: str | None = None,
+    mcp_runtime_arn: str | None = None,
     trusted_hosts: list[str] | None = None,
 ) -> FastAPI:
     app = FastAPI(
@@ -240,7 +246,14 @@ def create_app(
             try:
                 # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
                 model = await asyncio.to_thread(model_factory)
-                async for event in agui_events(run, model, parquet, results_dir, mcp_url=mcp_url):
+                async for event in agui_events(
+                    run,
+                    model,
+                    parquet,
+                    results_dir,
+                    mcp_url=mcp_url,
+                    mcp_runtime_arn=mcp_runtime_arn,
+                ):
                     yield encoder.encode(event)
             except Exception:
                 yield encoder.encode(
@@ -278,9 +291,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="ローカルAG-UIサーバー")
     parser.add_argument("--model", choices=["sakura", "fixture"], default="sakura")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument(
-        "--mcp-url", help="ローカルMCPサーバーのURL（例：http://127.0.0.1:8001/mcp）"
-    )
+    mcp = parser.add_mutually_exclusive_group()
+    mcp.add_argument("--mcp-url", help="ローカルMCPサーバーのURL（例：http://127.0.0.1:8001/mcp）")
+    mcp.add_argument("--mcp-runtime-arn", help="IAM認証で接続する東京のMCP Runtime ARN")
     parser.add_argument("--data", type=Path, default=Path("data/synthetic.parquet"))
     parser.add_argument("--results", type=Path, default=Path("results"))
     args = parser.parse_args()
@@ -289,10 +302,17 @@ def main() -> None:
         settings = SakuraSettings.from_env()
         factory = settings.build_model
     else:
-        factory = partial(FixtureModel, compare=bool(args.mcp_url))
+        factory = partial(FixtureModel, compare=bool(args.mcp_url or args.mcp_runtime_arn))
     DataExplorer(args.data).describe()
     uvicorn.run(
-        create_app(factory, args.data, args.results, mode=args.model, mcp_url=args.mcp_url),
+        create_app(
+            factory,
+            args.data,
+            args.results,
+            mode=args.model,
+            mcp_url=args.mcp_url,
+            mcp_runtime_arn=args.mcp_runtime_arn,
+        ),
         host="127.0.0.1",
         port=args.port,
         access_log=False,

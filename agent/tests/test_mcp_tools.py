@@ -7,17 +7,20 @@ import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
 import httpx
 import httpx2
 import pytest
 from ag_ui.core import RunAgentInput
+from botocore.credentials import ReadOnlyCredentials
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 from test_runtime import completion, response, tool_message
 from test_server import decode_sse, run_input
 
-from exploration_agent import mcp_tools
+from exploration_agent import agentcore_mcp, mcp_tools
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_tools import connect_mcp
 from exploration_agent.server import agui_events, create_app
@@ -183,3 +186,106 @@ async def test_cancel_during_connect_closes_the_connection(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert closed == [True]
+
+
+RUNTIME_ARN = "arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/comparison-AbCdEf1234"
+
+
+async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
+    mcp_url, monkeypatch
+):
+    requests = []
+    credentials = []
+    sessions = []
+
+    def session():
+        key = f"test-key-{len(credentials)}"
+        credentials.append(key)
+        frozen = ReadOnlyCredentials(key, "test-secret", "test-session-token")
+        return SimpleNamespace(
+            get_credentials=lambda: SimpleNamespace(get_frozen_credentials=lambda: frozen)
+        )
+
+    async def forward(request):
+        requests.append(request)
+        assert request.url.host == "bedrock-agentcore.ap-northeast-1.amazonaws.com"
+        assert request.headers["Authorization"].startswith("AWS4-HMAC-SHA256 ")
+        assert f"Credential=test-key-{len(requests) - 1}/" in request.headers["Authorization"]
+        assert "/ap-northeast-1/bedrock-agentcore/aws4_request" in request.headers["Authorization"]
+        assert request.headers["X-Amz-Security-Token"] == "test-session-token"
+        if json.loads(request.content)["method"] == "server/discover":
+            sessions.append(request.headers["Mcp-Session-Id"])
+        elif len(requests) > 1:
+            assert request.headers["Mcp-Session-Id"] == returned_session
+        async with httpx.AsyncClient() as upstream:
+            response = await upstream.post(
+                mcp_url,
+                content=request.content,
+                headers={k: v for k, v in request.headers.items() if k != "host"},
+            )
+        return httpx2.Response(
+            response.status_code,
+            headers={**response.headers, "Mcp-Session-Id": returned_session},
+            content=response.content,
+        )
+
+    original_client = httpx2.AsyncClient
+    monkeypatch.setattr(agentcore_mcp.boto3, "Session", session)
+    monkeypatch.setattr(
+        agentcore_mcp.httpx2,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=httpx2.MockTransport(forward), **kwargs),
+    )
+    for _ in range(2):
+        returned_session = str(uuid4())
+        async with connect_mcp(None, runtime_arn=RUNTIME_ARN) as tools:
+            assert [tool.tool_name for tool in tools] == ["compare_values"]
+            # Use the real Strands adapter and MCP server, with only AWS HTTP ingress simulated.
+            client = tools[0].mcp_client
+            result = await asyncio.to_thread(
+                client.call_tool_sync,
+                "comparison",
+                "compare_values",
+                {"baseline": 100, "current": 120},
+            )
+            assert result["structuredContent"]["percent_change"] == 20
+    assert len(credentials) == len(requests)
+    assert len(sessions) == 2
+    assert sessions[0] != sessions[1]
+
+
+@pytest.mark.parametrize(
+    "arn",
+    [
+        RUNTIME_ARN.replace("ap-northeast-1", "us-east-1"),
+        RUNTIME_ARN + "?token=secret",
+        "https://example.com/mcp",
+        "",
+    ],
+)
+async def test_invalid_runtime_arn_is_rejected_before_connecting(arn):
+    with pytest.raises(ValueError):
+        async with connect_mcp(None, runtime_arn=arn):
+            pytest.fail("Invalid runtime must not connect")
+
+
+async def test_local_and_runtime_connections_are_mutually_exclusive():
+    with pytest.raises(ValueError):
+        async with connect_mcp("http://127.0.0.1:8001/mcp", runtime_arn=RUNTIME_ARN):
+            pytest.fail("Ambiguous connection must not connect")
+
+
+async def test_runtime_auth_does_not_sign_redirect_targets_or_use_missing_credentials(monkeypatch):
+    monkeypatch.setattr(
+        agentcore_mcp.boto3, "Session", lambda: SimpleNamespace(get_credentials=lambda: None)
+    )
+    auth = agentcore_mcp.RuntimeAuth(agentcore_mcp.runtime_url(RUNTIME_ARN))
+
+    async def unexpected(_request):
+        pytest.fail("Unauthenticated or mismatched requests must not be sent")
+
+    async with httpx2.AsyncClient(auth=auth, transport=httpx2.MockTransport(unexpected)) as client:
+        with pytest.raises(ValueError, match="署名先"):
+            await client.post("https://untrusted.invalid/mcp", json={})
+        with pytest.raises(ValueError, match="AWS認証情報"):
+            await client.post(auth.url, json={})

@@ -75,7 +75,12 @@ fixtureでは既存の項目確認・年別集計に続けてMCPの比較を実�
 さくらのサーバーでも同じ引数を使える。CLIは `explore ask '100から120への増減率は？' --mcp-url http://127.0.0.1:8001/mcp`。
 MCP接続はrunごとに作成・破棄する。接続失敗時にMCPを省略して処理を続けることはない。
 接続失敗時は `RUN_ERROR` で終了する。採用SDKでは初期化失敗の後処理から `RuntimeWarning` が出る場合がある。
-現在の接続先は認証情報を含まないループバックのHTTP URLに限定し、AWS向けのMCP配備・接続設定は未対応。
+`--mcp-url` は認証情報を含まないループバックのHTTP URLだけを許可する。
+AgentCoreへ接続する場合は `--mcp-runtime-arn` で東京のRuntime ARNを指定する。
+両方の同時指定は拒否する。AWS標準チェーンの一時認証情報を各HTTPリクエストで取得し、IAM SigV4で署名する。
+接続中はAgentCoreのMCPセッションIDを引き継ぎ、次のrunでは新しく作る。
+AgentCore側の起動設定は `MCP_RUNTIME_ARN` を使い、起動・`/ping` ではMCPへ接続しない。
+配備とモデルAPI不要の接続確認は [MCPのREADME](../mcp/README.md#agentcoreへの配備)を参照。
 
 比較結果は小さな数値4項目をモデルへ返し、別途 `data_result` で右ペインへ表示する。
 既存のDuckDB検索結果のプレビュー・要約分離は維持する。MCPの構造化結果が自動でLLMから隔離されるとはみなさない。

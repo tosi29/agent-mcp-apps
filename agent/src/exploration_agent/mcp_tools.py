@@ -10,26 +10,36 @@ from urllib.parse import urlparse
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPAgentTool, MCPClient
 
+from exploration_agent.agentcore_mcp import runtime_client
 from exploration_agent.results import ResultStore
 
 
 @asynccontextmanager
-async def connect_mcp(url: str | None) -> AsyncIterator[list[MCPAgentTool]]:
-    if url is None:
+async def connect_mcp(
+    url: str | None, *, runtime_arn: str | None = None
+) -> AsyncIterator[list[MCPAgentTool]]:
+    if url is not None and runtime_arn is not None:
+        raise ValueError("ローカルMCP URLとMCP Runtime ARNは同時に指定できません")
+    if url is None and runtime_arn is None:
         yield []
         return
-    parsed = urlparse(url)
-    if (
-        parsed.scheme != "http"
-        or parsed.hostname not in {"127.0.0.1", "localhost"}
-        or parsed.username
-        or parsed.password
-        or parsed.query
-        or parsed.fragment
-        or parsed.path != "/mcp"
-    ):
-        raise ValueError("MCP URLにはループバックのhttp://127.0.0.1:8001/mcp等を指定してください")
-    client = MCPClient(url=url, startup_timeout=5, tool_filters={"allowed": ["compare_values"]})
+    if runtime_arn is not None:
+        client = runtime_client(runtime_arn)
+    else:
+        parsed = urlparse(url)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"127.0.0.1", "localhost"}
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/mcp"
+        ):
+            raise ValueError(
+                "MCP URLにはループバックのhttp://127.0.0.1:8001/mcp等を指定してください"
+            )
+        client = MCPClient(url=url, startup_timeout=5, tool_filters={"allowed": ["compare_values"]})
     opening = asyncio.create_task(asyncio.to_thread(client.start))
     try:
         await asyncio.shield(opening)

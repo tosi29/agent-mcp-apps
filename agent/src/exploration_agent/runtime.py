@@ -176,6 +176,7 @@ async def stream_question(
     results_dir: Path,
     *,
     mcp_url: str | None = None,
+    mcp_runtime_arn: str | None = None,
     max_model_calls: int = 4,
     timeout_seconds: float = 120,
 ) -> AsyncIterator[dict[str, Any]]:
@@ -212,7 +213,7 @@ async def stream_question(
         try:
             stop_reason = None
             async with asyncio.timeout(timeout_seconds):
-                async with connect_mcp(mcp_url) as mcp_tools:
+                async with connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as mcp_tools:
                     agent = Agent(
                         model=model,
                         system_prompt=SYSTEM_PROMPT,

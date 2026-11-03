@@ -2,6 +2,7 @@ import httpx
 import pytest
 from test_server import decode_sse, run_input
 
+from exploration_agent import agentcore_server
 from exploration_agent.agentcore_server import create_agentcore_app
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.server import create_app
@@ -52,3 +53,22 @@ async def test_local_entrypoint_still_rejects_remote_hosts(parquet, tmp_path):
         transport=httpx.ASGITransport(app=app), base_url="http://runtime.internal:8080"
     ) as client:
         assert (await client.get("/ping")).status_code == 400
+
+
+def test_agentcore_mcp_configuration_is_lazy_and_fixture_enables_comparison(
+    parquet, tmp_path, monkeypatch
+):
+    arn = "arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/comparison-AbCdEf1234"
+    monkeypatch.setenv("EXPLORER_DATA_PATH", str(parquet))
+    monkeypatch.setenv("MCP_RUNTIME_ARN", arn)
+    captured = {}
+
+    def capture(factory, *_args, **kwargs):
+        captured.update(kwargs)
+        captured["model"] = factory()
+        return "app"
+
+    monkeypatch.setattr(agentcore_server, "create_app", capture)
+    assert create_agentcore_app() == "app"
+    assert captured["mcp_runtime_arn"] == arn
+    assert captured["model"].compare is True

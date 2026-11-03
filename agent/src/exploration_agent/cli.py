@@ -38,7 +38,9 @@ def parser() -> argparse.ArgumentParser:
     ask.add_argument("prompt")
     ask.add_argument("--sse", action="store_true", help="HTTPではなく標準出力にSSEフレームを出す")
     ask.add_argument("--no-stream", action="store_true", help="非streamモードで互換性を切り分ける")
-    ask.add_argument("--mcp-url", help="ローカルMCPサーバーのURL")
+    mcp = ask.add_mutually_exclusive_group()
+    mcp.add_argument("--mcp-url", help="ローカルMCPサーバーのURL")
+    mcp.add_argument("--mcp-runtime-arn", help="IAM認証で接続する東京のMCP Runtime ARN")
     return root
 
 
@@ -46,7 +48,12 @@ async def ask(args: argparse.Namespace) -> int:
     model = SakuraSettings.from_env(stream=not args.no_stream).build_model()
     status = 1
     async for event in stream_question(
-        args.prompt, model, args.data, args.results, mcp_url=args.mcp_url
+        args.prompt,
+        model,
+        args.data,
+        args.results,
+        mcp_url=args.mcp_url,
+        mcp_runtime_arn=args.mcp_runtime_arn,
     ):
         output(event, args.sse)
         if event["type"] == "done":
