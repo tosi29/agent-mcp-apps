@@ -7,6 +7,16 @@ locals {
   partition      = data.aws_partition.current.partition
   logs_arn       = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/${local.agent_name}-*"
   sakura_enabled = var.sakura_api_key_parameter_name != null
+  runtime_observability = {
+    AGENT_OBSERVABILITY_ENABLED                        = "true"
+    OTEL_PYTHON_DISTRO                                 = "aws_distro"
+    OTEL_PYTHON_CONFIGURATOR                           = "aws_configurator"
+    OTEL_TRACES_EXPORTER                               = "otlp"
+    OTEL_LOGS_EXPORTER                                 = "otlp"
+    OTEL_METRICS_EXPORTER                              = "awsemf"
+    OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "true"
+    UNIFIED_TRACES_DESTINATION_ENABLED                 = "true"
+  }
 }
 
 resource "aws_ecr_repository" "agent" {
@@ -65,6 +75,22 @@ resource "aws_iam_role_policy" "agent" {
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "${local.logs_arn}:log-stream:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments", "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules", "xray:GetSamplingTargets"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricData"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "cloudwatch:namespace" = "bedrock-agentcore" }
+        }
       }
     ]
   })
@@ -78,7 +104,11 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
   role_arn           = aws_iam_role.agent.arn
   platform_version   = "V2"
   environment_variables = merge(
-    { EXPLORER_MODEL_MODE = local.sakura_enabled ? "sakura" : "fixture" },
+    local.runtime_observability,
+    {
+      EXPLORER_MODEL_MODE = local.sakura_enabled ? "sakura" : "fixture"
+      OTEL_SERVICE_NAME   = local.agent_name
+    },
     local.sakura_enabled ? {
       SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
       SAKURA_MODEL_ID               = var.sakura_model_id == null ? "" : var.sakura_model_id

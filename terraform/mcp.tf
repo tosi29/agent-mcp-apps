@@ -59,6 +59,22 @@ resource "aws_iam_role_policy" "mcp" {
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
         Resource = "${local.mcp_logs_arn}:log-stream:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments", "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules", "xray:GetSamplingTargets"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricData"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "cloudwatch:namespace" = "bedrock-agentcore" }
+        }
       }
     ]
   })
@@ -71,6 +87,9 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp" {
   description        = "IAM-protected MCP numerical comparison tools"
   role_arn           = aws_iam_role.mcp.arn
   platform_version   = "V2"
+  environment_variables = merge(local.runtime_observability, {
+    OTEL_SERVICE_NAME = local.mcp_name
+  })
 
   agent_runtime_artifact {
     container_configuration {

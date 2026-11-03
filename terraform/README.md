@@ -113,7 +113,7 @@ MCPだけを更新する場合は `node scripts/push-images.mjs mcp` を使う�
 Terraform自身はビルド・pushを実行しない。
 
 Terraformがエージェントに `MCP_RUNTIME_ARN` を渡し、その実行ロールへ対象RuntimeとDEFAULTエンドポイントの
-`bedrock-agentcore:InvokeAgentRuntime` のみを追加する。MCP側のロールにはMCPイメージとログへの権限だけを付ける。
+`bedrock-agentcore:InvokeAgentRuntime` のみを追加する。MCP側のロールにはMCPイメージとログ・トレース・メトリクスの送信権限を付ける。
 MCP Runtimeは `prevent_destroy` のため、作成後にダイジェストをnullへ戻して削除する操作は拒否される。
 
 `mcp_runtime_arn` を使った接続確認は [MCPのREADME](../mcp/README.md#agentcoreへの配備)を参照。
@@ -159,6 +159,20 @@ SMOKE_URL="$WEB_URL" npm run smoke
 画面・静的ファイル・SSE・独立した結果イベント・合成データの期待値・正常終了を検査する。
 ブラウザの描画確認は別途必要。Lambda、API Gateway、AgentCoreの利用料金は発生し得る。
 
+## AgentCoreのログとテレメトリ
+
+エージェントとMCPはADOTで計装し、ログ・トレース・メトリクスを有効にする。
+ログとスパンの送信先は `/aws/bedrock-agentcore/runtimes/<Runtime ID>-DEFAULT`。
+`UNIFIED_TRACES_DESTINATION_ENABLED=true` でRuntimeごとのロググループへスパンを集約する。
+実行ロールにX-Rayの送信・サンプリング取得権限と、`bedrock-agentcore` 名前空間のメトリクス送信権限を付ける。
+アカウント・リージョンでCloudWatch Transaction Searchを有効にしておく必要がある。
+そのアカウント全体の設定はこのTerraformでは変更しない。
+
+反映には両コンテナの再ビルド・ECR pushとplan・applyが必要。
+CloudWatchへの到達は、反映後に新しいセッションで呼び出して確認する。
+設定の根拠は [AgentCoreの計装手順](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability-configure.html) と
+[実行ロールの権限](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html) を参照。
+
 ## 制約
 
 - `/` と `/{proxy+}` を同じLambdaへ中継し、画面・静的ファイル・チャットAPIを同じOriginで配信する。
@@ -169,7 +183,7 @@ SMOKE_URL="$WEB_URL" npm run smoke
 - 入力は128KiB、Python側で40メッセージまで。上流SSEは2MiB・1フレーム256K文字まで。
 - AgentCoreへの通信は130秒、Lambdaは150秒、API Gatewayは155秒で制限する。上流の異常終了は `RUN_ERROR` にする。
 - APIは毎秒10件・バースト30件でスロットリングする。静的ファイル取得も対象で、費用の厳密な上限ではない。
-- リクエスト本文のトレースは無効。質問・結果・認証ヘッダーをアプリログへ記録しない。Lambdaログは7日保持。
+- エージェントとMCPのログ・トレース・メトリクスはADOTで有効にする。質問・回答・ツール引数・結果も記録対象。キーや認証ヘッダーは記録しない。Lambdaログは7日保持。
 - ブラウザの切断がLambdaへ通知されることや、AgentCore内の実行・課金が即時停止することは保証しない。
 - 会話履歴はLambdaプロセスのメモリ内。再起動や別の実行環境への振り分けで保持されない。結果ファイルもRuntimeの一時領域で、別取得・永続化は未実装。
 - Runtimeは `prevent_destroy` を設定し、ECRもイメージを残したまま強制削除しない。
