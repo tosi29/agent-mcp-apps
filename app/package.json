@@ -9,15 +9,17 @@
     "typecheck": "NEXT_TELEMETRY_DISABLED=1 COPILOTKIT_TELEMETRY_DISABLED=true DO_NOT_TRACK=1 next typegen && tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "test": "node --test scripts/*.test.mjs",
+    "dev:sandbox": "node scripts/mcp-apps-sandbox.mjs",
     "package:lambda": "node scripts/package-lambda.mjs",
     "build:lambda": "node scripts/build-lambda.mjs"
   },
   "dependencies": {
+    "@ag-ui/client": "1.0.3",
     "@aws-sdk/client-bedrock-agentcore": "3.1161.0",
     "@aws-sdk/client-bedrock-agentcore-control": "3.1161.0",
-    "@ag-ui/client": "1.0.3",
     "@copilotkit/react-core": "1.83.0",
     "@copilotkit/runtime": "1.83.0",
+    "@modelcontextprotocol/ext-apps": "2.0.4",
     "next": "16.4.4",
     "react": "19.3.1",
     "react-dom": "19.3.1"

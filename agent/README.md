@@ -12,10 +12,11 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 | `search_transactions` | MCP | 地域・年・価格範囲で検索 |
 | `aggregate_transactions` | MCP | 地域・年・四半期で集計 |
 | `compare_values` | MCP | 差分・増減率の計算 |
+| `show_transaction_dashboard` | MCP Apps | 棒グラフと表のダッシュボードを表示 |
 
 通常のPythonツールの例は `src/exploration_agent/tools.py` の `echo_text`。
 MCP未接続でも使用でき、外部通信・ファイル操作・状態変更は行わない。
-MCPが指定されている場合は、探索4ツールが揃わないと実行を開始しない。ローカル関数へのフォールバックはない。
+MCPが指定されている場合は、5ツールが揃わないと実行を開始しない。ローカル関数へのフォールバックはない。
 
 ## ローカル起動
 
@@ -30,6 +31,7 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 
 127.0.0.1:8000の `GET /ping` と `POST /invocations` を提供する。終了はCtrl+C。
 fixtureは項目確認・新宿区の年別集計・数値比較を行う固定シナリオで、モデルAPIは呼ばない。
+質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換えた固定シナリオになる。
 推論表示にも、サンプルであることを明記した固定テキストを送る。
 MCP接続先を省略したfixtureは `echo_text` だけを呼ぶ。検索結果は生成しない。
 画面の起動方法は [appのREADME](../app/README.md) を参照。
@@ -64,6 +66,10 @@ MCPの `content` はモデル用の要約と最大3行、`structuredContent` は
 `MCPPreviewHook` が表示用データを独立した `data_result` イベントへ変換し、
 `structuredContent` とMCPメタデータをモデルの会話状態へ入る前に取り除く。
 検索結果の全量（上限200行）はMCP側に一時保存する。エージェントは保存しない。
+MCP Appsツールでは結果の `_meta.preview` をUIへ送り、モデルの会話状態から取り除く。
+UIが必要になったときだけ、Apps capabilityを明示した別のリソース専用MCP接続でHTMLを取得する。
+同じrun内ではHTMLを再利用する。HTMLは最大768KiB、許可した `ui://` リソース1つに制限する。
+HTML・ツール引数・UI専用結果は `data_result.app` に載せ、会話メッセージへコピーしない。
 任意SQLを受け付けず、列・集計・条件値の制御はMCP側で行う。
 
 推論テキストはAG-UIの `REASONING_*` で渡し、CopilotKitの開閉表示を使う。
@@ -85,7 +91,7 @@ IAM署名と一時認証情報の取得は各HTTPリクエストで行い、接�
 `--mcp-url` との同時指定はできない。fixtureでもAgentCoreへの実接続には料金が発生し得る。
 
 配備手順は [TerraformのREADME](../terraform/README.md#mcpの配備)。
-探索4ツールに対応するMCPとエージェントを両方更新する必要がある。クラウドの実動作は配備後に確認する。
+5ツールに対応するMCPとエージェントを両方更新する必要がある。クラウドの実動作は配備後に確認する。
 MCP初期化失敗時、採用SDKの後処理から `RuntimeWarning` が出る場合がある。
 
 ## テスト

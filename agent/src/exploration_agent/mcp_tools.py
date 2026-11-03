@@ -1,9 +1,9 @@
-"""Request-scoped MCP connection and UI projection of the small comparison result."""
+"""Request-scoped MCP connection and bounded, model-independent result projection."""
 
 import asyncio
 import math
 import re
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -12,14 +12,16 @@ from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPAgentTool, MCPClient
 
 from exploration_agent.agentcore_mcp import runtime_client
+from exploration_agent.mcp_apps import APP_TOOL
 
 MCP_TOOL_NAMES = (
     "describe_dataset",
     "search_transactions",
     "aggregate_transactions",
     "compare_values",
+    APP_TOOL,
 )
-RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values"}
+RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values", APP_TOOL}
 
 
 @asynccontextmanager
@@ -76,18 +78,28 @@ async def connect_mcp(
 class MCPPreviewHook(HookProvider):
     """Forward bounded previews to the UI, then remove them from agent conversation state."""
 
-    def __init__(self, emit: Callable[..., None]):
+    def __init__(
+        self,
+        emit: Callable[..., None],
+        app_loader: Callable[[], Awaitable[dict[str, dict]]] | None = None,
+    ):
         self.emit = emit
+        self.apps: dict[str, dict] = {}
+        self.app_loader = app_loader
+        self._app_task: asyncio.Task[dict[str, dict]] | None = None
 
     def register_hooks(self, registry: HookRegistry, **kwargs) -> None:
         registry.add_callback(AfterToolCallEvent, self.after_tool)
 
-    def after_tool(self, event: AfterToolCallEvent) -> None:
+    async def after_tool(self, event: AfterToolCallEvent) -> None:
         name = event.tool_use["name"]
         if name not in MCP_TOOL_NAMES:
             return
         payload = event.result.pop("structuredContent", None)
-        event.result.pop("metadata", None)
+        metadata = event.result.pop("metadata", None)
+        summary = payload
+        if name == APP_TOOL:
+            payload = metadata.get("preview") if isinstance(metadata, dict) else None
         if name not in RESULT_TOOLS or event.result.get("status") != "success":
             return
         if not isinstance(payload, dict):
@@ -137,4 +149,28 @@ class MCPPreviewHook(HookProvider):
             preview["dataset"] = payload["dataset"]
         if type(payload.get("synthetic")) is bool:
             preview["synthetic"] = payload["synthetic"]
+        if name == APP_TOOL:
+            group_by = payload.get("group_by")
+            if group_by not in {"municipality", "year", "quarter"}:
+                raise ValueError("MCP Appの集計区分が不正です")
+            app_preview = {**preview, "group_by": group_by}
+            if name not in self.apps and self.app_loader:
+                if self._app_task is None:
+                    self._app_task = asyncio.create_task(self.app_loader())
+                self.apps = await self._app_task
+            if name not in self.apps:
+                raise ValueError("MCP AppのHTMLが取得されていません")
+            preview["app"] = {
+                **self.apps[name],
+                "toolInput": event.tool_use.get("input", {}),
+                "toolResult": {
+                    "content": [
+                        {"type": "text", "text": block["text"]}
+                        for block in event.result.get("content", [])
+                        if isinstance(block.get("text"), str)
+                    ],
+                    "structuredContent": summary,
+                    "_meta": {"preview": app_preview},
+                },
+            }
         self.emit("data_result", tool_call_id=event.tool_use["toolUseId"], **preview)

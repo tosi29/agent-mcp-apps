@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>取引データのダッシュボード</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#213547;background:#fff;font-size:14px}*{box-sizing:border-box}body{margin:0;padding:20px}h1{font-size:19px;margin:0 0 8px}p{color:#607080;line-height:1.6}header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center}select{font:inherit;padding:8px;border:1px solid #bccad2;border-radius:6px;background:#fff}#chart{display:grid;gap:14px;margin:24px 0}.bar-row{display:grid;grid-template-columns:80px 1fr 110px;gap:10px;align-items:center}.track{height:22px;background:#eaf2f2;border-radius:4px;overflow:hidden}.bar{height:100%;background:#22847d;border-radius:4px}.value{text-align:right;font-variant-numeric:tabular-nums}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:10px;border-bottom:1px solid #e0e7eb;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{background:#f4f8f8;font-weight:600}#status{font-size:12px}label{display:flex;gap:8px;align-items:center}
+</style></head><body>
+<header><div><h1>取引データのダッシュボード</h1><p id="subtitle">結果を受信しています…</p></div>
+<label>表示指標<select id="metric"><option value="average_price_yen">平均取引総額</option><option value="transaction_count">取引件数</option></select></label></header>
+<div id="chart" role="img" aria-label="取引データの棒グラフ"></div>
+<div class="scroll"><table><thead><tr><th>区分</th><th>取引件数</th><th>平均取引総額（円）</th><th>最小（円）</th><th>最大（円）</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="status" role="status">MCP Appsに接続しています…</p>
+<script>/* APP_SCRIPT */</script></body></html>

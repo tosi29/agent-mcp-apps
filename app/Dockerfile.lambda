@@ -10,6 +10,8 @@ RUN npm ci --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY . .
 ARG NEXT_PUBLIC_BASE_PATH=/poc
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+ARG NEXT_PUBLIC_MCP_APPS_SANDBOX_URL=""
+ENV NEXT_PUBLIC_MCP_APPS_SANDBOX_URL=${NEXT_PUBLIC_MCP_APPS_SANDBOX_URL}
 RUN npm run build && npm run package:lambda && rm -rf .next node_modules
 
 FROM scratch AS artifact

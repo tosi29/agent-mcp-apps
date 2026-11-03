@@ -1,6 +1,6 @@
 # MCPツール
 
-独立したPython・uvプロジェクト。公式MCP Python SDKで次の4ツールを公開する。
+独立したPython・uvプロジェクト。公式MCP Python SDKで次の5ツールを公開する。
 
 | ツール | 機能 |
 | --- | --- |
@@ -8,6 +8,7 @@
 | `search_transactions` | 地域の完全一致・年・価格範囲で検索 |
 | `aggregate_transactions` | 地域・年・四半期で件数・価格の平均／最小／最大を集計 |
 | `compare_values` | 2数値の差分・増減率を計算 |
+| `show_transaction_dashboard` | 集計結果をMCP Appsの棒グラフ・表で表示 |
 
 DuckDB・Parquet・結果ファイルはこのプロジェクトが管理する。Strandsには依存しない。
 
@@ -16,6 +17,8 @@ DuckDB・Parquet・結果ファイルはこのプロジェクトが管理する�
 以下の `cd` はリポジトリ直下を起点にする。
 
 ```sh
+npm --prefix mcp/ui ci --ignore-scripts
+npm --prefix mcp/ui run build
 cd mcp
 uv sync --locked
 uv run --locked explore-mcp prepare-sample
@@ -29,6 +32,20 @@ APIキーとモデルAPIは不要。DuckDBで信頼済みのローカルParquet�
 地域は千代田区・新宿区・渋谷区、期間は2023〜2025年。価格・面積・時期は架空で、市場価格の判断に使えない。
 `--data`／`MCP_DATA_PATH` はサーバー管理者が設定し、ツール引数にはパスを受け付けない。
 このコマンドはループバック限定・認証なしのローカル検証用。
+
+## MCP Apps
+
+`show_transaction_dashboard` は `group_by`（地域・年・四半期）・`municipality`・`year` で集計する。
+ツールの `_meta.ui.resourceUri` は `ui://exploration/transaction-dashboard-v1.html` を参照し、
+`resources/read` で `text/html;profile=mcp-app` のHTMLを返す。公式Python SDKの `Apps` 拡張を使う。
+
+`mcp/ui/` は公式Apps SDKを含む自己完結HTMLを生成する。成果物はGit管理外で、wheelには明示的に含める。
+DockerビルドではNodeステージで生成し、Pythonイメージへコピーする。実行時にNodeや外部CDNは使わない。
+画面では平均取引総額と取引件数を切り替えられる。追加のサーバー呼び出しは行わない。
+
+モデル向けの `content`・`structuredContent` は最大3行の要約。画面用の最大20行は結果の `_meta.preview` に置く。
+UI非対応クライアントでも同じテキスト要約を利用できる。通常の4ツールの戻り値は変更しない。
+ホスト側のsandboxと起動方法は [appのREADME](../app/README.md#mcp-appsの表示) を参照。
 
 ## 検索と結果の制約
 
@@ -143,5 +160,7 @@ uv run --locked ruff format --check src tests
 uv run --locked pytest -q
 ```
 
-HTTPテストは4ツールの公開・JSON応答・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
+HTTPテストは5ツールの公開・UIリソース取得・テキストフォールバック・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
 Strandsとの実HTTP接続・AG-UI結果イベント・モデル履歴との分離は `agent/` の `uv run --locked pytest -q` で確認する。
+UIの描画処理・指標切り替え・0件表示は `npm --prefix mcp/ui test`（リポジトリ直下）で検査する。
+これは模擬DOM上のテストで、実ブラウザの描画・sandbox隔離の検証とは区別する。

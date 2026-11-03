@@ -13,6 +13,7 @@ agent/data/
 agent/results/
 mcp/data/
 mcp/results/
+mcp/src/exploration_mcp/ui/
 .next/
 node_modules/
 *.tsbuildinfo

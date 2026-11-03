@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from functools import partial
 from typing import Any
 from uuid import uuid4
@@ -21,6 +21,7 @@ from strands import Agent
 from strands.models.model import Model
 
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_apps import load_app_resources
 from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
 from exploration_agent.runtime import SYSTEM_PROMPT, RequestHooks, SakuraSettings, build_tools
 
@@ -46,6 +47,7 @@ async def agui_events(
             run,
             model,
             mcp_tools=tools,
+            app_loader=partial(load_app_resources, tools, mcp_url, mcp_runtime_arn),
             max_model_calls=max_model_calls,
             timeout_seconds=remaining,
         ):
@@ -57,6 +59,7 @@ async def _agui_events(
     model: Model,
     *,
     mcp_tools: list,
+    app_loader: Callable[[], Awaitable[dict[str, dict]]],
     max_model_calls: int,
     timeout_seconds: float,
 ) -> AsyncIterator:
@@ -88,7 +91,7 @@ async def _agui_events(
     adapter = StrandsAgent(
         agent=template,
         name="explorer",
-        hooks=[hooks, MCPPreviewHook(observe)],
+        hooks=[hooks, MCPPreviewHook(observe, app_loader)],
         config=StrandsAgentConfig(
             tool_behaviors={
                 name: ToolBehavior(custom_result_handler=custom_result)

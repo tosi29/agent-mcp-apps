@@ -1,6 +1,17 @@
 import type { AgentSubscriber } from "@ag-ui/client";
 
 type Row = Record<string, string | number | null>;
+export type McpAppResult = {
+  resourceUri: string;
+  mimeType: "text/html;profile=mcp-app";
+  html: string;
+  toolInput: Record<string, unknown>;
+  toolResult: {
+    content: { type: "text"; text: string }[];
+    structuredContent?: Record<string, unknown>;
+    _meta: Record<string, unknown>;
+  };
+};
 export type DataResult = {
   result_id: string;
   tool_call_id: string;
@@ -10,6 +21,7 @@ export type DataResult = {
   truncated: boolean;
   preview_truncated: boolean;
   preview_rows: Row[];
+  app?: McpAppResult;
 };
 export type ResultRun = {
   runId: string;

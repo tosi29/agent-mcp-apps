@@ -3,5 +3,8 @@
 !uv.lock
 !src/
 !src/**
+!ui/
+!ui/**
+ui/node_modules/
 **/__pycache__/
 **/*.pyc

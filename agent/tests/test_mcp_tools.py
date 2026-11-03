@@ -93,6 +93,71 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
     assert "result_id" not in json.dumps(requests)
 
 
+@pytest.mark.parametrize("parallel", [False, True])
+async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monkeypatch, parallel):
+    from exploration_agent.mcp_apps import load_app_resources
+
+    requests = []
+    loads = []
+
+    async def load(*args):
+        loads.append(True)
+        return await load_app_resources(*args)
+
+    monkeypatch.setattr("exploration_agent.server.load_app_resources", load)
+
+    def handle(request):
+        requests.append(json.loads(request.content))
+        message = tool_message(
+            "show_transaction_dashboard", {"group_by": "quarter", "municipality": "新宿区"}
+        )
+        if parallel:
+            message["tool_calls"] += tool_message(
+                "show_transaction_dashboard", {"group_by": "quarter"}, "call-second-app"
+            )["tool_calls"]
+        answer = (
+            completion(message, "tool_calls")
+            if len(requests) == 1
+            else completion(
+                {"role": "assistant", "content": "合成データのグラフを表示しました。"}, "stop"
+            )
+        )
+        return response(answer, not parallel)
+
+    async with AsyncOpenAI(
+        api_key="test-only",
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
+    ) as client:
+        events = [
+            event.model_dump(mode="json", by_alias=True)
+            async for event in agui_events(
+                RunAgentInput.model_validate(run_input()),
+                OpenAIModel(client=client, model_id="mock", stream=not parallel),
+                mcp_url=mcp_url,
+            )
+        ]
+    assert events[-1]["type"] == "RUN_FINISHED"
+    results = [event["value"] for event in events if event.get("name") == "data_result"]
+    assert len(results) == (2 if parallel else 1)
+    assert len({result["result_id"] for result in results}) == len(results)
+    assert len(loads) == 1
+    result = results[0]
+    assert len(result["preview_rows"]) == 4
+    app = result["app"]
+    assert app["resourceUri"] == "ui://exploration/transaction-dashboard-v1.html"
+    assert app["mimeType"] == "text/html;profile=mcp-app"
+    assert "<html" in app["html"]
+    assert app["toolInput"]["group_by"] == "quarter"
+    assert app["toolResult"]["content"][0]["type"] == "text"
+    assert len(app["toolResult"]["_meta"]["preview"]["preview_rows"]) == 4
+    assert "preview_rows" not in json.dumps(requests)
+    assert "<html" not in json.dumps(requests)
+    tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
+    assert len(json.loads(tool_result["content"])["sample_rows"]) == 3
+    assert "preview_rows" not in json.dumps([e for e in events if e["type"] == "TOOL_CALL_RESULT"])
+
+
 async def test_unavailable_mcp_fails_without_falling_back(tmp_path, unused_tcp_port):
     app = create_app(
         FixtureModel,

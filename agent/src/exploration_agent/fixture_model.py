@@ -14,6 +14,7 @@ class FixtureModel(Model):
     def __init__(self, *, compare: bool = False):
         self.calls = 0
         self.compare = compare
+        self.dashboard = False
 
     def get_config(self) -> dict:
         return {"model_id": "fixture-no-api"}
@@ -27,6 +28,10 @@ class FixtureModel(Model):
 
     async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
         self.calls += 1
+        if self.calls == 1 and self.compare:
+            # Two explicit canned scenarios; this does not understand natural language.
+            text = json.dumps(messages[-1], ensure_ascii=False)
+            self.dashboard = "ダッシュボード" in text or "グラフ" in text
         yield {"messageStart": {"role": "assistant"}}
         if self.calls == 1:
             yield {"contentBlockStart": {"start": {}}}
@@ -43,6 +48,8 @@ class FixtureModel(Model):
         if self.calls <= tool_calls:
             name = "describe_dataset" if self.calls == 1 else "aggregate_transactions"
             args = {} if self.calls == 1 else {"municipality": "新宿区", "group_by": "year"}
+            if self.calls == 2 and self.dashboard:
+                name = "show_transaction_dashboard"
             if not self.compare:
                 name, args = "echo_text", {"text": "接続テスト"}
             if self.calls == 3:

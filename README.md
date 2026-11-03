@@ -26,6 +26,8 @@ Node.js（[.node-version](.node-version) のバージョン）、npm、Python 3.
 リポジトリ直下から実行する。
 
 ```sh
+npm --prefix mcp/ui ci --ignore-scripts
+npm --prefix mcp/ui run build
 cd mcp
 uv sync --locked
 uv run --locked explore-mcp prepare-sample
@@ -58,12 +60,19 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 ```sh
 # ターミナル3
 cd app
-npm run dev
+NEXT_PUBLIC_MCP_APPS_SANDBOX_URL=http://127.0.0.1:3001/sandbox npm run dev
+```
+
+```sh
+# ターミナル4：MCP Appsの別オリジンsandbox
+cd app
+npm run dev:sandbox
 ```
 
 <http://127.0.0.1:3000> を開く。終了は各ターミナルでCtrl+C。
-fixtureモードは質問内容にかかわらず新宿区の年別集計を実行する固定シナリオで、
+fixtureモードは新宿区の年別集計を実行する固定シナリオで、
 自然言語の理解やモデルの回答品質を検証するものではない。
+「ダッシュボード」または「グラフ」を含む質問では、MCP Apps表示用の固定シナリオに切り替わる。
 
 さくらAI Engineで質問する場合は、[agentの接続設定](agent/README.md#さくらai-engineへの接続)を行い、
 ターミナル2を次のコマンドに置き換える。
@@ -85,7 +94,8 @@ Lambda用ZIPは `npm --prefix app run build:lambda`、エージェント・MCP�
 ECRスクリプトはダイジェストのJSONを更新する。配備は別途plan・applyで行う。
 
 探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textのみ。
-構成と起動方法は [mcp/README.md](mcp/README.md) を参照。MCP Appsは使用しない。
+加えて `show_transaction_dashboard` がMCP AppsのUIを提供する。構成と起動方法は [mcp/README.md](mcp/README.md) を参照。
+クラウドでMCP Appsを表示するための別オリジンsandbox配備は、現在のTerraformには含めない。
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。

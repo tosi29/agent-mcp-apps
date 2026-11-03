@@ -3,8 +3,10 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { HttpAgent } from "@ag-ui/client";
+import { McpUiToolResultNotificationSchema } from "@modelcontextprotocol/ext-apps/app-bridge";
 
 const live = process.argv.includes("--live");
+const apps = process.argv.includes("--apps");
 const origin = (process.env.SMOKE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
 const status = await fetch(`${origin}/api/agent-status`).then(r => r.json());
 assert.equal(status.connected, true, "Python backend is not running");
@@ -28,7 +30,7 @@ const agent = new HttpAgent({
   headers: { Origin: new URL(origin).origin },
 });
 agent.addMessage({ id: crypto.randomUUID(), role: "user",
-  content: "項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて" });
+  content: apps ? "新宿区の年別ダッシュボードを表示して" : "項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて" });
 const started = performance.now();
 const observations = [];
 await agent.runAgent({}, {
@@ -47,6 +49,14 @@ assert.equal(data.total_count, 3);
 assert.deepEqual(data.preview_rows.map(row => row.year), [2023, 2024, 2025]);
 assert.deepEqual(data.preview_rows.map(row => row.transaction_count), [40, 40, 40]);
 assert.deepEqual(data.preview_rows.map(row => row.average_price_yen), [42500000, 42500000, 42500000]);
+if (apps) {
+  assert.equal(data.app?.mimeType, "text/html;profile=mcp-app");
+  assert.ok(data.app.html.includes("取引データのダッシュボード"));
+  assert.equal(data.app.toolResult._meta.preview.preview_rows.length, 3);
+  McpUiToolResultNotificationSchema.parse({ method: "ui/notifications/tool-result", params: data.app.toolResult });
+  assert.ok(!JSON.stringify(agent.messages).includes("<html"));
+  assert.ok(!JSON.stringify(agent.messages).includes("preview_rows"));
+}
 const metrics = custom.find(e => e.name === "run_metrics")?.value;
 assert.ok(metrics.model_calls <= 4);
 assert.equal(metrics.tool_errors, 0);

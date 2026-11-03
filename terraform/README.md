@@ -91,7 +91,7 @@ state、tfvars、plan、ZIP、実行結果はGitに含めない。
 
 ## MCPの配備
 
-探索・比較4ツールを持つMCPを、エージェントと別のECR・実行ロール・AgentCore Runtime V2に配置する。
+探索・比較4ツールとMCP Appsツールを持つMCPを、エージェントと別のECR・実行ロール・AgentCore Runtime V2に配置する。
 ParquetはMCPイメージのビルド時に生成し、エージェントには含めない。
 プロトコルは `MCP`、認証はIAM SigV4。CognitoやOAuthのリソースは追加しない。
 `mcp_image_digest` 未指定ならMCP用ECRとIAMのみ作成し、RuntimeやエージェントのMCP接続設定は作らない。
@@ -118,7 +118,9 @@ MCP Runtimeは `prevent_destroy` のため、作成後にダイジェストをnu
 
 `mcp_runtime_arn` を使った接続確認は [MCPのREADME](../mcp/README.md#agentcoreへの配備)を参照。
 ローカルのfixtureで接続すればモデルAPIは呼ばないが、AgentCoreの利用料金は発生し得る。
-AWS上のIAM認可とV2復元後の動作は配備後に検証する。MCP Apps対応はこの配備設定には含まない。
+AWS上のIAM認可とV2復元後の動作は配備後に検証する。
+MCP AppsのHTMLはMCPイメージに含むが、ブラウザ用の別オリジンsandbox配備はこのTerraformに含めない。
+公開環境でのApps表示には、sandboxの配置とNext.jsのビルド時URL設定が別途必要。
 
 ## さくらのAPIキーを指定する
 

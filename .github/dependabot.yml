@@ -20,3 +20,8 @@ updates:
     directory: "/agent"
     patterns: ["*"]
     multi-ecosystem-group: "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/mcp/ui"
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"

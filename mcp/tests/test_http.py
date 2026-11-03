@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import httpx
 import pytest
 
+from exploration_mcp.apps import DASHBOARD_URI
 from exploration_mcp.server import create_agentcore_app, create_app
 
 
@@ -50,6 +51,7 @@ async def test_discovery_and_tool_call_return_single_json_without_session(parque
             "search_transactions",
             "aggregate_transactions",
             "compare_values",
+            "show_transaction_dashboard",
         }
         response = await client.post(
             "/mcp",
@@ -147,6 +149,50 @@ async def test_query_limits_and_group_allowlist_are_enforced_over_mcp(
             headers={"Mcp-Method": "tools/call", "Mcp-Name": name},
         )
         assert reply.json()["result"]["isError"] is True
+
+
+async def test_app_discovery_resource_and_model_fallback(parquet, tmp_path):
+    async with http_client(parquet, tmp_path) as client:
+        tools = (
+            await client.post(
+                "/mcp", json=rpc("tools/list", {}), headers={"Mcp-Method": "tools/list"}
+            )
+        ).json()["result"]["tools"]
+        app_tool = next(tool for tool in tools if tool["name"] == "show_transaction_dashboard")
+        assert app_tool["_meta"]["ui"]["resourceUri"] == DASHBOARD_URI
+        resource = (
+            await client.post(
+                "/mcp",
+                json=rpc("resources/read", {"uri": DASHBOARD_URI}),
+                headers={"Mcp-Method": "resources/read", "Mcp-Name": DASHBOARD_URI},
+            )
+        ).json()["result"]["contents"][0]
+        assert resource["mimeType"] == "text/html;profile=mcp-app"
+        assert "取引データのダッシュボード" in resource["text"]
+        assert "/* APP_SCRIPT */" not in resource["text"]
+        assert "<script src=" not in resource["text"]
+        assert resource["_meta"]["ui"]["csp"]["connectDomains"] == []
+        # No Apps capability advertisement: the ordinary textual answer must still work.
+        result = (
+            await client.post(
+                "/mcp",
+                json=rpc(
+                    "tools/call",
+                    {
+                        "name": "show_transaction_dashboard",
+                        "arguments": {"group_by": "quarter", "municipality": "新宿区"},
+                    },
+                ),
+                headers={"Mcp-Method": "tools/call", "Mcp-Name": "show_transaction_dashboard"},
+            )
+        ).json()["result"]
+        summary = json.loads(result["content"][0]["text"])
+        assert summary["total_count"] == 4
+        assert len(summary["sample_rows"]) == 3
+        assert result["structuredContent"] == summary
+        assert len(result["_meta"]["preview"]["preview_rows"]) == 4
+        assert result["_meta"]["preview"]["group_by"] == "quarter"
+        assert "preview_rows" not in result["content"][0]["text"]
 
 
 async def test_untrusted_origin_host_and_oversized_request_are_rejected(parquet, tmp_path):

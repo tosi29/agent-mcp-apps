@@ -38,7 +38,13 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 # ターミナル3
 cd app
 npm ci --ignore-scripts
-npm run dev
+NEXT_PUBLIC_MCP_APPS_SANDBOX_URL=http://127.0.0.1:3001/sandbox npm run dev
+```
+
+```sh
+# ターミナル4：MCP Appsの別オリジンsandbox
+cd app
+npm run dev:sandbox
 ```
 
 <http://127.0.0.1:3000> を開く。MCPは127.0.0.1:8001、Pythonは127.0.0.1:8000、Next.jsは127.0.0.1:3000で待ち受ける。
@@ -57,7 +63,7 @@ npm run start
 
 ## 設定
 
-既定のローカル接続では、Next.js側の環境ファイルは不要。
+通常のチャットのローカル接続では、Next.js側の環境ファイルは不要。
 接続先を変更する場合のみ `.env.example` を `.env.local` にコピーし、`AGENT_URL` を設定する。
 既定値は `http://127.0.0.1:8000/invocations`。localhostまたは127.0.0.1のHTTPだけを許可する。
 
@@ -65,6 +71,32 @@ AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN`
 東京リージョンのRuntimeに接続し、AWS認証は標準チェーンを使う。Lambdaでは実行ロールから取得する。
 `InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。接続モードはRuntimeの `EXPLORER_MODEL_MODE` から取得する。
 モードが未設定なら `unknown` とし、fixtureとみなさない。
+
+## MCP Appsの表示
+
+「新宿区の年別ダッシュボードを表示して」と質問すると、MCPが提供するHTMLを右ペインに表示する。
+平均取引総額・取引件数を切り替えられる。fixtureモードではこの語句に対応する固定シナリオを実行する。
+元の検索結果表と同様に質問ごとの履歴へ残す。
+
+ホストには公式 `@modelcontextprotocol/ext-apps` の `AppBridge` を使う。
+MCPから取得したHTMLを直接Next.jsのDOMへ挿入せず、別オリジンのsandbox proxyと、その内側のiframeで描画する。
+`NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` はブラウザに公開されるURLであり、秘密情報を含めない。
+未設定なら設定不足を表示する。画面と同じオリジンは拒否し、クラウドではHTTPSが必要。
+
+ローカルproxyは `npm run dev:sandbox` で127.0.0.1:3001の `/sandbox` を提供する。
+ホストとして127.0.0.1:3000・localhost:3000を許可する。`APP_ORIGIN` 指定時はそのOriginだけに制限する。
+親・子ウィンドウのsourceとoriginを照合し、CSPで外部通信・外部アセット・フォーム・追加iframeを禁止する。
+proxy自身は認証情報や業務データの取得APIを持たず、ホストからHTMLとツール結果を受け取る。
+ホストはAppからのツール実行・チャット送信・モデルコンテキスト更新・外部リンクを許可しない。
+UI用HTMLを含むAG-UIイベントに対応するため、AgentCoreからの中継上限は1イベント2MiB・応答全体8MiB。
+これはアプリケーション側の受信ガードであり、AWSやMCPの仕様上限ではない。
+
+公開環境用のsandbox配備・別ドメインは現在のTerraformに含めない。クラウドで利用する前に別途設定する。
+`NEXT_PUBLIC_*` はビルド時に固定されるため、配備先URLを決めてからLambda用ZIPを作り直す。
+ZIPビルド時も `NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` を環境変数で渡すと、ビルドスクリプトがDockerへ引き継ぐ。
+
+MCP Appsの通信を含むHTTP疎通は `npm run smoke -- --apps` で確認する。
+これはブラウザ描画の検証ではない。画面ではiframeの表示・指標切り替え・履歴の開閉を確認する。
 
 ## Lambdaへの配備
 
@@ -91,7 +123,7 @@ JS/CSSには `assetPrefix`、画面内のAPI・ホームURLには `appPath()` �
 - 合成データの年別集計は2023〜2025年の3行で、各年40件・平均42,500,000円。
 - 停止・エラー表示と、狭い画面での入力・表の横スクロールを確認する。
 
-fixtureモードは質問内容にかかわらずこの集計を行う。固定シナリオであることを画面にも表示する。
+fixtureモードは固定シナリオで動く。「ダッシュボード」「グラフ」を含む場合だけApps表示に切り替わる。
 合成データの値は、実際の市場価格を示すものではない。
 
 ## テスト

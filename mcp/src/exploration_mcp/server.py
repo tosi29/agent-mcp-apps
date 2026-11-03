@@ -11,6 +11,7 @@ from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse, PlainTextResponse
 
+from exploration_mcp.apps import dashboard_app
 from exploration_mcp.data import DataExplorer, Filters, prepare_sample
 from exploration_mcp.results import ResultStore
 from exploration_mcp.tools import register_tools
@@ -39,7 +40,12 @@ def create_app(
     explorer.describe()
     default_results = "/tmp/results" if agentcore else "results"
     store = ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
-    server = MCPServer("exploration-tools", subscriptions=False, log_level="WARNING")
+    server = MCPServer(
+        "exploration-tools",
+        subscriptions=False,
+        log_level="WARNING",
+        extensions=[dashboard_app(explorer, store)],
+    )
     register_tools(server, explorer, store)
 
     @server.custom_route("/ping", methods=["GET"])

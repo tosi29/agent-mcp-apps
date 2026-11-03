@@ -7,12 +7,12 @@
 
 - `app/`：Next.js・TypeScript・CopilotKitの画面とTypeScript Runtime。構成管理はnpm。
 - `agent/`：Strands Agents・Pythonツールのechoサンプル・AG-UIサーバー。構成管理はuv。
-- `mcp/`：探索4ツールとDuckDB・Parquet・結果保存を持つMCPサーバー。Python・uvで管理し、ローカルまたはAgentCore上のStreamable HTTPでJSONを返す。
+- `mcp/`：探索4ツール・MCP AppsのダッシュボードとDuckDB・Parquet・結果保存を持つMCPサーバー。Python・uvで管理し、`mcp/ui/` のHTMLビルドはnpmで管理する。
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
 - MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルのみ。
-- ADK・MCP Appsは現在の実装範囲に含めない。導入や構成の重要な変更は相談する。
+- MCP Appsは右ペインのsandboxで描画する。ADKは実装範囲に含めない。クラウドのsandbox配備や構成の重要な変更は相談する。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
 
 ## データ探索の境界
@@ -28,6 +28,7 @@
 
 - LLM向けの件数・要約・少数サンプルと、画面向けの構造化結果・プレビュー・参照IDを分離する。
 - 画面用プレビューや大量の生データを、会話メッセージやモデル向けの共有状態へ戻さない。後続質問での再送にも注意する。
+- MCP AppのHTML・結果の `_meta` はUI専用とし、LLMへ渡さない。別オリジンのsandboxとCSPを維持する。Appからのツール実行・チャット送信・モデルコンテキスト更新は現在許可しない。
 - データの投影上限は実装とREADMEを参照し、変更する場合は両方を整合させる。
 - AG-UIの `TOOL_CALL_END` をツール実行の完了と同一視しない。実行の成否は対応する結果・状態イベントで扱う。
 - 合成データと実データを明確に区別する。合成データの値を実際の不動産取引や市場価格として説明しない。
@@ -63,6 +64,7 @@
 変更した範囲に応じて、必要な検証を実行する。文書だけの変更では、内容・参照先・差分を確認する。
 
 Pythonの変更は対象プロジェクトの `agent/` または `mcp/` で実行する。
+MCP AppのHTMLは先に `npm --prefix mcp/ui ci --ignore-scripts` と `npm --prefix mcp/ui run build` で生成する。
 
 ```sh
 uv run --locked ruff check src tests

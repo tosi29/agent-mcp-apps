@@ -1,3 +1,10 @@
+FROM node:26.13.0-bookworm-slim AS ui
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY ui/ ./
+RUN npm run build
+
 FROM python:3.12-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /usr/local/bin/uv
@@ -11,6 +18,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
+COPY --from=ui /src/exploration_mcp/ui/dashboard.html ./src/exploration_mcp/ui/dashboard.html
 RUN uv sync --locked --no-dev --no-editable \
     && .venv/bin/explore-mcp prepare-sample
 

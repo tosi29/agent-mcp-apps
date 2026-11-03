@@ -6,6 +6,7 @@ import {
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/paths";
 import { resultHistorySubscriber, type DataResult, type ResultRun } from "../lib/result-history";
+import { McpAppResultView } from "./mcp-app-result";
 
 const toolNames: Record<string, string> = {
   echo_text: "入力を返す（Pythonサンプル）",
@@ -13,6 +14,7 @@ const toolNames: Record<string, string> = {
   search_transactions: "条件に合う取引を検索",
   aggregate_transactions: "取引データを集計",
   compare_values: "差分・増減率を計算（MCP）",
+  show_transaction_dashboard: "取引ダッシュボードを表示（MCP Apps）",
 };
 const columnNames: Record<string, string> = {
   year: "年", municipality: "地域", quarter: "四半期", transaction_id: "取引ID",
@@ -111,8 +113,10 @@ function ChatWorkspace() {
             <span className="small-note">{tool.status === "success" ? "完了" : tool.status === "running" ? "実行中" : "中断・失敗"}</span>
           </li>)}
         </ol>}
-        {run.results.map(result => <ResultTable key={result.result_id} result={result}
-          label={toolNames[run.tools.find(tool => tool.id === result.tool_call_id)?.name ?? ""] ?? "検索・集計結果"} />)}
+        {run.results.map(result => result.app
+          ? <McpAppResultView key={result.result_id} app={result.app} />
+          : <ResultTable key={result.result_id} result={result}
+            label={toolNames[run.tools.find(tool => tool.id === result.tool_call_id)?.name ?? ""] ?? "検索・集計結果"} />)}
         {run.results.length === 0 && <p className="run-placeholder">{run.status === "running"
           ? "検索・集計結果を待っています…" : "この質問の検索・集計結果はありません。"}</p>}
         {run.metrics && <div className="run-summary">ツール実行 {run.metrics.tool_calls}回</div>}

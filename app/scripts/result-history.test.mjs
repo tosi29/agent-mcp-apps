@@ -7,6 +7,7 @@ const result = value => ({
   result_id: "same-result-id", tool_call_id: "tool", total_count: 1,
   count_unit: "rows", returned_count: 1, truncated: false, preview_truncated: false,
   preview_rows: [{ municipality: value }],
+  app: { resourceUri: "ui://test/view", html: `<html>ui-only-${value}</html>`, toolResult: { _meta: { private: value } } },
 });
 
 test("two runs keep both results and never resend UI previews to the model", async () => {
@@ -44,6 +45,8 @@ test("two runs keep both results and never resend UI previews to the model", asy
   assert.deepEqual(history.map(run => run.results[0].preview_rows[0].municipality), ["preview-only-1", "preview-only-2"]);
   assert.ok(history.every(run => run.status === "success" && run.tools[0].status === "success"));
   assert.ok(!JSON.stringify(outgoing[1]).includes("preview-only-1"));
+  assert.ok(history[0].results[0].app.html.includes("ui-only-"));
+  assert.ok(!JSON.stringify(outgoing).includes("<html>"));
   assert.deepEqual(agent.state, {});
 });
 
