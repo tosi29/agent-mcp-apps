@@ -81,6 +81,8 @@ AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN`
 ホストには公式 `@modelcontextprotocol/ext-apps` の `AppBridge` を使う。
 MCPから取得したHTMLを直接Next.jsのDOMへ挿入せず、別オリジンのsandbox proxyと、その内側のiframeで描画する。
 `NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` はブラウザに公開されるURLであり、秘密情報を含めない。
+クラウドでは `MCP_APPS_SANDBOX_URL` をLambdaの実行時環境変数で指定できる。
+サーバーがリクエストごとに画面へ渡す公開URLであり、APIキー等を含めない。実行時指定を優先する。
 未設定なら設定不足を表示する。画面と同じオリジンは拒否し、クラウドではHTTPSが必要。
 
 ローカルproxyは `npm run dev:sandbox` で127.0.0.1:3001の `/sandbox` を提供する。
@@ -92,7 +94,8 @@ UI用HTMLを含むAG-UIイベントに対応するため、AgentCoreからの中
 これはアプリケーション側の受信ガードであり、AWSやMCPの仕様上限ではない。
 
 公開環境用のsandbox配備・別ドメインは現在のTerraformに含めない。クラウドで利用する前に別途設定する。
-`NEXT_PUBLIC_*` はビルド時に固定されるため、配備先URLを決めてからLambda用ZIPを作り直す。
+`MCP_APPS_SANDBOX_URL` を使う場合、sandbox URLの変更だけならZIPの再ビルドは不要。
+`NEXT_PUBLIC_*` で指定する場合はビルド時に固定されるため、配備先URLを決めてからLambda用ZIPを作り直す。
 ZIPビルド時も `NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` を環境変数で渡すと、ビルドスクリプトがDockerへ引き継ぐ。
 
 MCP Appsの通信を含むHTTP疎通は `npm run smoke -- --apps` で確認する。

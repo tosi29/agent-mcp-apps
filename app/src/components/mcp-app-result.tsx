@@ -4,14 +4,14 @@ import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/
 import { useEffect, useRef, useState } from "react";
 import type { McpAppResult } from "../lib/result-history";
 
-export function McpAppResultView({ app }: { app: McpAppResult }) {
+export function McpAppResultView({ app, sandboxUrl }: { app: McpAppResult; sandboxUrl?: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState("MCP Appを読み込んでいます…");
 
   useEffect(() => {
     const iframe = frame.current;
     if (!iframe) return;
-    const configured = process.env.NEXT_PUBLIC_MCP_APPS_SANDBOX_URL;
+    const configured = sandboxUrl ?? process.env.NEXT_PUBLIC_MCP_APPS_SANDBOX_URL;
     if (!configured) {
       setStatus("MCP Appsのsandbox URLが設定されていません。");
       return;
@@ -82,7 +82,7 @@ export function McpAppResultView({ app }: { app: McpAppResult }) {
         finally { await bridge.close(); }
       })();
     };
-  }, [app]);
+  }, [app, sandboxUrl]);
 
   return <div className="mcp-app-result" data-testid="mcp-app-result">
     {status && <p className="small-note" role="status">{status}</p>}

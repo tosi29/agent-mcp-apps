@@ -29,7 +29,7 @@ function ReasoningHeader(props: ComponentProps<typeof CopilotChatReasoningMessag
     ? "考え中…" : props.elapsedSeconds === undefined ? "推論内容" : `推論 ${props.elapsedSeconds}秒`} />;
 }
 
-function ChatWorkspace() {
+function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
   const { agent, isReady } = useAgent({ agentId: "explorer" });
   useDefaultRenderTool();
   const [runs, setRuns] = useState<ResultRun[]>([]);
@@ -114,7 +114,7 @@ function ChatWorkspace() {
           </li>)}
         </ol>}
         {run.results.map(result => result.app
-          ? <McpAppResultView key={result.result_id} app={result.app} />
+          ? <McpAppResultView key={result.result_id} app={result.app} sandboxUrl={sandboxUrl} />
           : <ResultTable key={result.result_id} result={result}
             label={toolNames[run.tools.find(tool => tool.id === result.tool_call_id)?.name ?? ""] ?? "検索・集計結果"} />)}
         {run.results.length === 0 && <p className="run-placeholder">{run.status === "running"
@@ -147,7 +147,7 @@ function ResultTable({ result, label }: { result: DataResult; label: string }) {
   </div>;
 }
 
-export function ExplorationChat() {
+export function ExplorationChat({ sandboxUrl }: { sandboxUrl?: string }) {
   const [mode, setMode] = useState("connecting");
   useEffect(() => {
     fetch(appPath("/api/agent-status")).then(async response => {
@@ -168,7 +168,7 @@ export function ExplorationChat() {
     <div className="dataset-line">360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</div>
     {mode === "offline" && <div className="error-banner" role="alert">エージェントに接続できません。接続先の状態を確認してから再読み込みしてください。</div>}
     <CopilotKitProvider runtimeUrl={appPath("/api/copilotkit")} agentId="explorer" useSingleEndpoint={false} enableInspector={false}>
-      <ChatWorkspace />
+      <ChatWorkspace sandboxUrl={sandboxUrl} />
     </CopilotKitProvider>
     <footer className="site-footer">Strands + AG-UI + CopilotKit</footer>
   </main>;
