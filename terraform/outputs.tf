@@ -22,3 +22,8 @@ output "web_url" {
   description = "アクセス元IPを制限したNext.jsのブラウザURL。イメージ未指定時はnull。"
   value       = length(aws_bedrockagentcore_agent_runtime.agent) > 0 ? "${aws_api_gateway_stage.agent[0].invoke_url}/" : null
 }
+
+output "mcp_apps_sandbox_url" {
+  description = "チャットとは別オリジン・同じIP制限のMCP Apps sandbox URL。Lambdaへ自動設定する。"
+  value       = local.sandbox_url
+}

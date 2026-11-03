@@ -4,6 +4,7 @@ import { request } from "node:http";
 import { once } from "node:events";
 import { runInNewContext } from "node:vm";
 import { createSandboxServer, sandboxDocument } from "./mcp-apps-sandbox.mjs";
+import { sandboxHeaders } from "../src/lib/mcp-apps-sandbox.ts";
 
 test("sandbox HTTP response restricts networks, frames, permissions and embedding origins", async t => {
   const server = createSandboxServer();
@@ -66,4 +67,15 @@ test("proxy relays only the configured host and its own view and accepts HTML on
   assert.equal(viewMessages[0].message, result);
   assert.equal(viewMessages[0].origin, proxyOrigin);
   assert.throws(() => createSandboxServer(["https://example.com/path"]));
+});
+
+test("cloud sandbox embeds only the configured origin and rejects invalid allowlists", () => {
+  const origin = "https://chat.execute-api.ap-northeast-1.amazonaws.com";
+  const headers = sandboxHeaders([origin]);
+  assert.ok(headers["Content-Security-Policy"].endsWith(`frame-ancestors ${origin}`));
+  assert.ok(sandboxDocument([origin]).includes(JSON.stringify(origin)));
+  for (const origins of [[], ["*"], ["https://example.com/path"], ["https://user:password@example.com"], ["https://example.com\nX-Test: bad"]]) {
+    assert.throws(() => sandboxHeaders(origins));
+    assert.throws(() => sandboxDocument(origins));
+  }
 });

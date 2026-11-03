@@ -119,8 +119,33 @@ MCP Runtimeは `prevent_destroy` のため、作成後にダイジェストをnu
 `mcp_runtime_arn` を使った接続確認は [MCPのREADME](../mcp/README.md#agentcoreへの配備)を参照。
 ローカルのfixtureで接続すればモデルAPIは呼ばないが、AgentCoreの利用料金は発生し得る。
 AWS上のIAM認可とV2復元後の動作は配備後に検証する。
-MCP AppsのHTMLはMCPイメージに含むが、ブラウザ用の別オリジンsandbox配備はこのTerraformに含めない。
-公開環境でのApps表示には、sandboxの配置とNext.jsのビルド時URL設定が別途必要。
+MCP AppsのHTMLはMCPイメージに含む。ブラウザ用の別オリジンsandboxは以下の構成で配備する。
+
+## MCP Appsのsandbox配備
+
+`sandbox.tf` は専用のAPI Gateway REST APIを1つ追加し、`GET /poc/sandbox` だけを
+既存のNext.js Lambdaへ接続する。チャットとは別のAPI IDによる別オリジンになる。
+送信元IPはチャットと同じ `allowed_source_cidrs` に制限する。
+LambdaのWeb Adapterと出力形式を合わせるため、sandboxも `STREAM` 統合を使う。
+追加のLambda、ECR、S3、起動・ビルドスクリプトは不要。
+
+Lambdaの `MCP_APPS_SANDBOX_URL` と親画面の `APP_ORIGIN` はTerraformで設定する。
+URLをtfvarsやビルド時環境変数へ手入力する必要はない。
+Next.jsの `/sandbox` ルートを含むZIPと、Apps対応のAgent・MCPイメージを用意する。
+Agent・MCPが同じコードでpush済みなら、ECRへの再pushは不要。
+
+```sh
+# リポジトリ直下から
+npm --prefix app run build:lambda
+terraform -chdir=terraform plan -out=web.tfplan
+terraform -chdir=terraform apply web.tfplan
+terraform -chdir=terraform output -raw mcp_apps_sandbox_url
+```
+
+planでAPI Gateway関連とLambda invoke permissionの追加、既存LambdaのZIP・環境変数更新を確認する。
+配備後は許可したIPからチャットを開き、「新宿区の年別ダッシュボードを表示して」で
+iframe表示・指標切り替え・履歴の開閉を確認する。sandbox URLのHTTP確認だけでは描画確認にはならない。
+API Gateway・Lambda・AgentCoreの利用料金が発生し得る。
 
 ## さくらのAPIキーを指定する
 

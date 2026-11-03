@@ -99,7 +99,9 @@ ECRスクリプトはダイジェストのJSONを更新する。配備は別途p
 
 探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textのみ。
 加えて `show_transaction_dashboard` がMCP AppsのUIを提供する。構成と起動方法は [mcp/README.md](mcp/README.md) を参照。
-クラウドでMCP Appsを表示するための別オリジンsandbox配備は、現在のTerraformには含めない。
+クラウドのsandboxは専用API Gatewayの `/poc/sandbox` から配信する。
+チャットと同じNext.js Lambdaを共用し、別オリジンと同じ送信元IP制限を使う。
+URLはTerraformがLambdaへ自動設定する。配備は [TerraformのREADME](terraform/README.md#mcp-appsのsandbox配備) を参照。
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。

@@ -81,7 +81,7 @@ AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN`
 ホストには公式 `@modelcontextprotocol/ext-apps` の `AppBridge` を使う。
 MCPから取得したHTMLを直接Next.jsのDOMへ挿入せず、別オリジンのsandbox proxyと、その内側のiframeで描画する。
 `NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` はブラウザに公開されるURLであり、秘密情報を含めない。
-クラウドでは `MCP_APPS_SANDBOX_URL` をLambdaの実行時環境変数で指定できる。
+クラウドではTerraformが `MCP_APPS_SANDBOX_URL` をLambdaの実行時環境変数へ自動設定する。
 サーバーがリクエストごとに画面へ渡す公開URLであり、APIキー等を含めない。実行時指定を優先する。
 未設定なら設定不足を表示する。画面と同じオリジンは拒否し、クラウドではHTTPSが必要。
 
@@ -93,7 +93,11 @@ proxy自身は認証情報や業務データの取得APIを持たず、ホスト
 UI用HTMLを含むAG-UIイベントに対応するため、AgentCoreからの中継上限は1イベント2MiB・応答全体8MiB。
 これはアプリケーション側の受信ガードであり、AWSやMCPの仕様上限ではない。
 
-公開環境用のsandbox配備・別ドメインは現在のTerraformに含めない。クラウドで利用する前に別途設定する。
+クラウドでは専用API Gatewayの `GET /poc/sandbox` を既存Lambdaへ接続し、Next.jsの `/sandbox` から配信する。
+チャットとsandboxは別オリジンで、同じ `allowed_source_cidrs` に制限する。
+追加のLambdaや起動・ビルドスクリプトは使わず、既存の `npm run build:lambda` でZIPを作る。
+`APP_ORIGIN` を親画面の許可リストとCSPに使い、未設定・不正な値では `/sandbox` は503を返す。
+クラウドのAPIはこのGETだけを公開し、チャットAPIや他のパスを公開しない。
 `MCP_APPS_SANDBOX_URL` を使う場合、sandbox URLの変更だけならZIPの再ビルドは不要。
 `NEXT_PUBLIC_*` で指定する場合はビルド時に固定されるため、配備先URLを決めてからLambda用ZIPを作り直す。
 ZIPビルド時も `NEXT_PUBLIC_MCP_APPS_SANDBOX_URL` を環境変数で渡すと、ビルドスクリプトがDockerへ引き継ぐ。

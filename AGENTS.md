@@ -13,6 +13,7 @@
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
 - MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルのみ。
 - MCP Appsは右ペインのsandboxで描画する。ADKは実装範囲に含めない。クラウドのsandbox配備や構成の重要な変更は相談する。
+- クラウドのsandboxは専用API Gatewayの `GET /poc/sandbox` を既存Next.js Lambdaへ接続する。同じ送信元IP制限と別オリジンを維持し、URLはTerraformから実行時環境変数へ渡す。HTML・中継処理はローカルproxyと共用し、起動・ビルドスクリプトを増やさない。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
 
 ## データ探索の境界

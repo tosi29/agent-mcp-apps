@@ -91,6 +91,7 @@ resource "aws_lambda_function" "web" {
     variables = {
       AGENT_RUNTIME_ARN                      = one(aws_bedrockagentcore_agent_runtime.agent[*].agent_runtime_arn)
       APP_ORIGIN                             = "https://${aws_api_gateway_rest_api.agent[0].id}.execute-api.ap-northeast-1.amazonaws.com"
+      MCP_APPS_SANDBOX_URL                   = local.sandbox_url
       AWS_LAMBDA_EXEC_WRAPPER                = "/opt/bootstrap"
       AWS_LWA_INVOKE_MODE                    = "response_stream"
       AWS_LWA_PORT                           = "8080"
