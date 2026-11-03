@@ -45,24 +45,32 @@ terraform -chdir=terraform plan -out=bootstrap.tfplan
 terraform -chdir=terraform apply bootstrap.tfplan
 ```
 
-ARM64エージェントイメージをビルドしてECRへpushし、ダイジェストを取得する。
+ECR作成後、エージェント・MCPのARM64イメージをビルドしてpushする。
+リポジトリ直下から、共通のスクリプトを実行する。
 
 ```sh
-AGENT_REPO="$(terraform -chdir=terraform output -raw agent_repository_url)"
-AGENT_TAG="$(git rev-parse --short HEAD)"
-aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin "${AGENT_REPO%%/*}"
-docker build --platform linux/arm64 -t "$AGENT_REPO:$AGENT_TAG" agent
-docker push "$AGENT_REPO:$AGENT_TAG"
-aws ecr describe-images --region ap-northeast-1 --repository-name agent-mcp-apps/agent --image-ids imageTag="$AGENT_TAG" --query 'imageDetails[0].imageDigest' --output text
+node scripts/push-images.mjs all
 ```
+
+片方だけ更新する場合は `all` を `agent` または `mcp` に置き換える。
+AWS CLIの認証情報は標準チェーンを使い、push先はTerraformのoutputから取得する。
+タグはGitコミットIDと実行時刻から作り、IMMUTABLEの同一タグを再利用しない。
+
+ダイジェスト取得後、Git管理外の `terraform/images.auto.tfvars.json` を自動更新する。
+標準出力にpush先・各ダイジェスト・JSONの更新先と内容を表示する。
+片方だけ指定した場合は、JSON内のもう片方の値を保持する。同時に複数プロセスで実行しない。
+指定した全対象が成功した時だけJSONを更新する。途中で失敗した場合はJSONを保持し、push済みのイメージはECRに残る。
+スクリプトはplan・applyを実行しない。
 
 ## 設定とapply
 
-Git除外対象の `terraform/terraform.tfvars` に、イメージのダイジェストとブラウザを使う端末の送信元CIDRを設定する。
-既存Runtimeを使う場合はイメージダイジェストを維持する。
+Git除外対象の `terraform/terraform.tfvars` に、ブラウザを使う端末の送信元CIDR等を設定する。
+イメージのダイジェストはスクリプトが生成した `images.auto.tfvars.json` から自動で読み込まれる。
+既存の `terraform.tfvars` にもダイジェストがある場合は、自動生成ファイル側が優先される。
+初回の `all` 実行成功後、重複する `agent_image_digest`・`mcp_image_digest` は `terraform.tfvars` から削除してよい。
+自動生成ファイルを削除すると配備対象が変わるため、既存Runtimeの値を保持する。
 
 ```hcl
-agent_image_digest   = "sha256:取得した64桁のダイジェスト"
 allowed_source_cidrs = ["自分のグローバルIPv4/32"]
 ```
 
@@ -90,28 +98,19 @@ ParquetはMCPイメージのビルド時に生成し、エージェントには�
 
 1. `mcp_image_digest` を省略したplanを確認し、MCP用ECRとIAMを作成する。
 2. `mcp/` と `agent/` の両方のARM64イメージをビルドし、それぞれのECRへpushする。
-3. `terraform.tfvars` の `mcp_image_digest` と `agent_image_digest` を実際のダイジェストへ更新する。
+3. スクリプトが `images.auto.tfvars.json` へ両方のダイジェストを書き込んだことを確認する。
 4. planでMCP Runtimeの追加、エージェントのイメージ・環境変数・呼び出し権限の更新を確認してapplyする。
 
-MCPイメージのビルド・pushはリポジトリ直下で実行する。ECRへのpushとapplyは事前に確認する。
+MCPとエージェントをまとめて更新する場合は、リポジトリ直下で実行する。
+ECRへのpushとapplyは事前に確認する。
 
 ```sh
-MCP_REPO="$(terraform -chdir=terraform output -raw mcp_repository_url)"
-MCP_TAG="$(git rev-parse --short HEAD)"
-aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin "${MCP_REPO%%/*}"
-docker build --platform linux/arm64 -t "$MCP_REPO:$MCP_TAG" mcp
-docker push "$MCP_REPO:$MCP_TAG"
-aws ecr describe-images --region ap-northeast-1 --repository-name agent-mcp-apps/mcp --image-ids imageTag="$MCP_TAG" --query 'imageDetails[0].imageDigest' --output text
+node scripts/push-images.mjs all
 ```
 
-エージェントも「初期セットアップ」のコマンドでビルド・pushする。
+MCPだけを更新する場合は `node scripts/push-images.mjs mcp` を使う。
 古いエージェントイメージのままでは `MCP_RUNTIME_ARN` を設定しても接続しない。
 Terraform自身はビルド・pushを実行しない。
-
-```hcl
-mcp_image_digest   = "sha256:MCPイメージの64桁のダイジェスト"
-agent_image_digest = "sha256:MCP接続対応エージェントの64桁のダイジェスト"
-```
 
 Terraformがエージェントに `MCP_RUNTIME_ARN` を渡し、その実行ロールへ対象RuntimeとDEFAULTエンドポイントの
 `bedrock-agentcore:InvokeAgentRuntime` のみを追加する。MCP側のロールにはMCPイメージとログへの権限だけを付ける。
@@ -140,7 +139,7 @@ sakura_model_id               = "preview/Kimi-K2.7-Code"
 AgentCoreの実行ロールには、そのパラメータ1つの `ssm:GetParameter` だけを付与する。
 起動・ページ表示ではキーを取得せず、AgentCoreが各runで復号取得する。Next.jsはキーを受け取らない。
 
-SSM対応の新しいエージェントイメージをECRへpushし、`agent_image_digest` を更新してから切り替える。
+SSM対応の新しいエージェントイメージを `node scripts/push-images.mjs agent` でpushしてから切り替える。
 旧fixture専用イメージのまま設定だけを変更しない。Next.jsの接続モード表示も更新するため、Web用ZIPも再ビルド・配備する。
 push・apply・実API検証は実行前に確認する。SSMの実権限とさくらの応答は、デプロイ後の検証が必要。
 

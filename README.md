@@ -79,6 +79,11 @@ uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/m
 
 ## 制約と詳細
 
+AWS向けのビルド・pushは [TerraformのREADME](terraform/README.md#ビルド) を参照。
+Lambda用ZIPは `npm --prefix app run build:lambda`、エージェント・MCP両方のECR pushは
+`node scripts/push-images.mjs all` で実行する。片方なら引数を `agent` または `mcp` にする。
+ECRスクリプトはダイジェストのJSONを更新する。配備は別途plan・applyで行う。
+
 探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textのみ。
 構成と起動方法は [mcp/README.md](mcp/README.md) を参照。MCP Appsは使用しない。
 
