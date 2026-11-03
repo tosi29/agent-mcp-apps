@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import logging
 import os
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 
 from exploration_mcp.apps import dashboard_app
 from exploration_mcp.data import DataExplorer, Filters, prepare_sample
+from exploration_mcp.observability import configure_observability
 from exploration_mcp.results import ResultStore
 from exploration_mcp.tools import register_tools
 
@@ -33,6 +33,7 @@ class RejectBrowserOrigin:
 def create_app(
     *, agentcore: bool = False, data_path: Path | None = None, results_dir: Path | None = None
 ):
+    configure_observability()
     explorer = DataExplorer(
         data_path or Path(os.environ.get("MCP_DATA_PATH", "data/synthetic.parquet"))
     )
@@ -43,7 +44,7 @@ def create_app(
     server = MCPServer(
         "exploration-tools",
         subscriptions=False,
-        log_level="WARNING",
+        log_level=os.environ.get("LOG_LEVEL", "INFO"),
         extensions=[dashboard_app(explorer, store)],
     )
     register_tools(server, explorer, store)
@@ -69,7 +70,6 @@ def create_app(
 
 
 def create_agentcore_app():
-    logging.disable(logging.CRITICAL)
     return create_app(agentcore=True)
 
 
@@ -89,7 +89,6 @@ def main() -> None:
     result = commands.add_parser("result", help="同じMCP環境の保存結果を読む（モデルAPI不要）")
     result.add_argument("result_id")
     args = parser.parse_args()
-    logging.disable(logging.CRITICAL)
     if args.command == "prepare-sample":
         prepare_sample(args.data)
         print(json.dumps({"row_count": 360, "path": str(args.data), "synthetic": True}))
@@ -108,8 +107,8 @@ def main() -> None:
         create_app(data_path=args.data, results_dir=args.results),
         host="127.0.0.1",
         port=args.port,
-        access_log=False,
-        log_level="warning",
+        access_log=True,
+        log_level=os.environ.get("LOG_LEVEL", "info").lower(),
     )
 
 

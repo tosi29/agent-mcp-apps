@@ -88,6 +88,10 @@ uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/m
 
 ## 制約と詳細
 
+エージェントとMCPのログ・トレース・メトリクスは有効。
+通常のローカル起動ではstderr、AgentCoreではADOT経由でCloudWatchへ出す。
+質問・回答・ツール引数・結果も記録対象。詳細は [ログ設定](agent/README.md#ログとテレメトリ) を参照。
+
 AWS向けのビルド・pushは [TerraformのREADME](terraform/README.md#ビルド) を参照。
 Lambda用ZIPは `npm --prefix app run build:lambda`、エージェント・MCP両方のECR pushは
 `node scripts/push-images.mjs all` で実行する。片方なら引数を `agent` または `mcp` にする。

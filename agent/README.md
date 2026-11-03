@@ -94,6 +94,19 @@ IAM署名と一時認証情報の取得は各HTTPリクエストで行い、接�
 5ツールに対応するMCPとエージェントを両方更新する必要がある。クラウドの実動作は配備後に確認する。
 MCP初期化失敗時、採用SDKの後処理から `RuntimeWarning` が出る場合がある。
 
+## ログとテレメトリ
+
+通常の `uv run` 起動では、Pythonログ・OTelトレース・メトリクスをstderrへ出す。
+外部のOTel送信先は設定しない。CLIのJSON/SSEはstdoutへ出す。
+既定のログレベルはINFOで、`LOG_LEVEL=DEBUG` などで変更できる。
+質問・回答・ツールの引数と結果・例外も記録対象になる。APIキーや認証ヘッダーは記録しない。
+
+コンテナは `opentelemetry-instrument` で起動する。単体のDocker起動ではconsole exporterを使い、
+端末のコンテナ出力へ出す。Terraform配備時は環境変数でADOTのAWS exporterへ切り替える。
+AgentCoreでは各RuntimeのCloudWatch Logsへログとスパン、CloudWatchへメトリクスを送る。
+Transaction Searchの有効化が必要。送信権限・配備手順は [TerraformのREADME](../terraform/README.md) を参照。
+`opentelemetry-instrument` などでproviderを事前設定した場合はその設定を使い、console exporterを重ねない。
+
 ## テスト
 
 先に `mcp/` で `uv sync --locked` を行う。agentの統合テストはMCP用の仮想環境から

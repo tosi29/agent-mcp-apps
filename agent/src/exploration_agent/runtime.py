@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from collections.abc import AsyncIterator, Callable
@@ -24,7 +25,10 @@ from strands.models.openai import OpenAIModel
 
 from exploration_agent.mcp_apps import load_app_resources
 from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
+from exploration_agent.observability import configure_observability, log_callback
 from exploration_agent.tools import echo_text
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """あなたは表形式データの探索担当です。日本語で回答してください。
 扱うデータは合成データであり、実際の不動産取引や市場価格ではありません。必ず明示してください。
@@ -89,6 +93,7 @@ class RequestHooks(HookProvider):
         self.model_calls += 1
 
     def before_tool(self, event: BeforeToolCallEvent) -> None:
+        logger.info("tool_start %s", event.tool_use)
         self.tool_calls += 1
         self.emit(
             "tool_start",
@@ -98,6 +103,7 @@ class RequestHooks(HookProvider):
         )
 
     def after_tool(self, event: AfterToolCallEvent) -> None:
+        logger.info("tool_end %s", event.result)
         status = event.result.get("status", "error")
         self.tool_errors += status != "success"
         # Raw exceptions may contain paths, provider responses, or secrets. Do not forward them.
@@ -123,6 +129,7 @@ async def stream_question(
     timeout_seconds: float = 120,
 ) -> AsyncIterator[dict[str, Any]]:
     """One question per fresh agent. No durable sessions or raw SDK events on the wire."""
+    configure_observability()
     if not prompt.strip() or len(prompt) > 4000:
         raise ValueError("prompt must contain 1–4000 characters")
     if not 1 <= max_model_calls <= 10:
@@ -163,7 +170,7 @@ async def stream_question(
                                 partial(load_app_resources, mcp_tools, mcp_url, mcp_runtime_arn),
                             ),
                         ],
-                        callback_handler=None,
+                        callback_handler=log_callback,
                         retry_strategy=None,
                     )
                     async for event in agent.stream_async(prompt):
@@ -181,6 +188,7 @@ async def stream_question(
                 tool_errors=hooks.tool_errors,
             )
         except Exception as error:
+            logger.exception("Agent run failed request_id=%s", request_id)
             emit(
                 "error",
                 code=type(error).__name__,

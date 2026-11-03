@@ -1,6 +1,5 @@
 """AgentCore entrypoint with explicit fixture or Parameter Store-backed Sakura mode."""
 
-import logging
 import os
 from functools import partial
 
@@ -8,12 +7,13 @@ from fastapi import FastAPI
 
 from exploration_agent.agentcore_mcp import runtime_url
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.observability import configure_observability
 from exploration_agent.parameter_store import build_sakura_model_from_parameter_store
 from exploration_agent.server import create_app
 
 
 def create_agentcore_app() -> FastAPI:
-    logging.disable(logging.CRITICAL)
+    configure_observability()
     mode = os.environ.get("EXPLORER_MODEL_MODE", "fixture")
     mcp_runtime_arn = os.environ.get("MCP_RUNTIME_ARN")
     if mcp_runtime_arn is not None:

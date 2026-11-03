@@ -150,6 +150,14 @@ IAM署名は各HTTPリクエストで生成し、一時認証情報も都度取�
 仕様：[AgentCore MCP契約](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp-protocol-contract.html)、
 [IAM認証](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-oauth.html)。
 
+## ログとテレメトリ
+
+通常の `uv run` 起動では、ログ・OTelトレース・メトリクスをstderrへ出し、外部へ送信しない。
+ログレベルの既定はINFOで、`LOG_LEVEL` で変更する。
+コンテナはADOTで計装し、単体のDocker起動ではconsole exporterを使う。
+Terraform配備時はAWS exporterへ切り替え、CloudWatchへ送信する。
+詳細は [エージェントのログ設定](../agent/README.md#ログとテレメトリ) を参照。
+
 ## テスト
 
 `mcp/` で実行する。

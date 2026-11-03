@@ -23,9 +23,11 @@ from strands.models.model import Model
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_apps import load_app_resources
 from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
+from exploration_agent.observability import configure_observability, log_callback
 from exploration_agent.runtime import SYSTEM_PROMPT, RequestHooks, SakuraSettings, build_tools
 
 MAX_BODY_BYTES = 128 * 1024
+logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = {"http://127.0.0.1:3000", "http://localhost:3000"}
 
 
@@ -85,7 +87,7 @@ async def _agui_events(
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=build_tools() + mcp_tools,
-        callback_handler=None,
+        callback_handler=log_callback,
         retry_strategy=None,
     )
     adapter = StrandsAgent(
@@ -101,7 +103,10 @@ async def _agui_events(
                 ]
             },
             # Explicitly preserve no-retry behavior when the adapter clones the template.
-            thread_agent_kwargs=lambda _: {"retry_strategy": None, "callback_handler": None},
+            thread_agent_kwargs=lambda _: {
+                "retry_strategy": None,
+                "callback_handler": log_callback,
+            },
         ),
     )
     # Do not expose frontend tools, arbitrary UI state, attachments, or injected A2UI configuration.
@@ -123,6 +128,7 @@ async def _agui_events(
                 if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
                     continue
                 if event.type == EventType.RUN_ERROR:
+                    logger.error("Agent run failed run_id=%s error=%s", run.run_id, event.message)
                     yield RunErrorEvent(
                         type=EventType.RUN_ERROR,
                         code="AGENT_RUN_FAILED",
@@ -141,6 +147,7 @@ async def _agui_events(
                     )
                 yield event
     except Exception:
+        logger.exception("Agent run failed run_id=%s", run.run_id)
         if not started:
             yield RunStartedEvent(
                 type=EventType.RUN_STARTED,
@@ -162,17 +169,11 @@ def create_app(
     mcp_runtime_arn: str | None = None,
     trusted_hosts: list[str] | None = None,
 ) -> FastAPI:
+    configure_observability()
     app = FastAPI(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        telemetry={
-            "auto_configure": False,
-            "tracing": False,
-            "metrics": False,
-            "logs": False,
-            "operation_spans": False,
-        },
     )
     app.add_middleware(
         TrustedHostMiddleware,
@@ -241,6 +242,7 @@ def create_app(
                 ):
                     yield encoder.encode(event)
             except Exception:
+                logger.exception("Agent setup failed run_id=%s", run.run_id)
                 yield encoder.encode(
                     RunStartedEvent(
                         type=EventType.RUN_STARTED,
@@ -280,7 +282,7 @@ def main() -> None:
     mcp.add_argument("--mcp-url", help="ローカルMCPサーバーのURL（例：http://127.0.0.1:8001/mcp）")
     mcp.add_argument("--mcp-runtime-arn", help="IAM認証で接続する東京のMCP Runtime ARN")
     args = parser.parse_args()
-    logging.disable(logging.CRITICAL)
+    configure_observability()
     if args.model == "sakura":
         settings = SakuraSettings.from_env()
         factory = settings.build_model
@@ -295,7 +297,7 @@ def main() -> None:
         ),
         host="127.0.0.1",
         port=args.port,
-        access_log=False,
+        access_log=True,
     )
 
 

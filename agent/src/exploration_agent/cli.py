@@ -5,7 +5,10 @@ import asyncio
 import json
 import logging
 
+from exploration_agent.observability import configure_observability
 from exploration_agent.runtime import SakuraSettings, stream_question
+
+logger = logging.getLogger(__name__)
 
 
 def output(value: dict, sse: bool = False) -> None:
@@ -49,14 +52,15 @@ async def ask(args: argparse.Namespace) -> int:
 
 def main() -> None:
     args = parser().parse_args()
-    # Provider/library debug logging can include entire requests or responses.
-    logging.disable(logging.CRITICAL)
+    configure_observability()
     try:
         raise SystemExit(asyncio.run(ask(args)))
     except ValueError as error:
+        logger.exception("Agent CLI input failed")
         output({"type": "error", "message": str(error)})
         raise SystemExit(1) from None
     except Exception:
+        logger.exception("Agent CLI failed")
         output(
             {
                 "type": "error",

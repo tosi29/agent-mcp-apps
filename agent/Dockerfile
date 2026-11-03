@@ -6,6 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PYTHON_DOWNLOADS=never \
     UV_LINK_MODE=copy \
+    OTEL_TRACES_EXPORTER=console \
+    OTEL_LOGS_EXPORTER=console \
+    OTEL_METRICS_EXPORTER=console \
+    OTEL_AWS_APPLICATION_SIGNALS_ENABLED=false \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
@@ -17,4 +21,4 @@ RUN uv sync --locked --no-dev --no-editable
 USER 10001:10001
 EXPOSE 8080
 
-CMD ["uvicorn", "exploration_agent.agentcore_server:create_agentcore_app", "--factory", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
+CMD ["opentelemetry-instrument", "uvicorn", "exploration_agent.agentcore_server:create_agentcore_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]
