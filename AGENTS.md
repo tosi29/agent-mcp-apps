@@ -7,7 +7,7 @@
 
 - `app/`：Next.js・TypeScript・CopilotKitの画面とTypeScript Runtime。構成管理はnpm。
 - `agent/`：Strands Agents・通常のPythonツール・DuckDB・AG-UIサーバー。構成管理はuv。
-- `mcp/`：既存ツールとは別のMCPサーバー。Python・uvで管理し、ローカルのStreamable HTTPでJSONを返す。
+- `mcp/`：既存ツールとは別のMCPサーバー。Python・uvで管理し、ローカルまたはAgentCore上のStreamable HTTPでJSONを返す。
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
@@ -43,6 +43,7 @@
 - 推論時は質問・会話履歴・ツール結果の要約が外部モデルAPIへ送られることを踏まえ、実データの導入前に送信範囲を確認する。
 - クラウドリソース作成、費用が発生する操作、公開は実行前に相談する。既に許可された調査・ローカル実装・検証は進める。
 - ローカルサーバーのループバック限定を維持する。公開配備では認証・アクセス制限を別途設計する。
+- MCPのクラウド接続は東京のAgentCore Runtime ARNを指定し、IAM SigV4で署名する。認証情報は起動時に保持せず各HTTPリクエストで取得する。任意の外部MCP URLは許可しない。
 
 ## 依存関係と仕様の確認
 

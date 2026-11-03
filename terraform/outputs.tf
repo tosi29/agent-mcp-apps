@@ -1,3 +1,13 @@
+output "mcp_repository_url" {
+  description = "MCP用ARM64イメージのpush先。"
+  value       = aws_ecr_repository.mcp.repository_url
+}
+
+output "mcp_runtime_arn" {
+  description = "IAM認証で接続するMCP Runtime ARN。イメージ未指定時はnull。"
+  value       = one(aws_bedrockagentcore_agent_runtime.mcp[*].agent_runtime_arn)
+}
+
 output "agent_repository_url" {
   description = "AgentCore用ARM64イメージのpush先。"
   value       = aws_ecr_repository.agent.repository_url

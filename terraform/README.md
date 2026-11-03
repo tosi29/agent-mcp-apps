@@ -7,6 +7,7 @@ Browser → API Gateway Regional REST API /poc/（送信元IP制限）
   → Lambda Node.js 26 / ARM64 ZIP
     → Web Adapter → Next.js / CopilotKit Runtime
       → AgentCore Runtime V2 / AG-UI → Strands → DuckDB
+                                       └─ IAM SigV4 → MCP用AgentCore Runtime V2（任意）
 ```
 
 Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
@@ -34,7 +35,7 @@ TerraformはビルドやECRへのpushを実行しない。LambdaはZIPのハッ�
 
 ## 初期セットアップ
 
-最初はイメージダイジェスト未指定でECRとAgentCore用IAMだけを作る。
+最初はイメージダイジェスト未指定でエージェント・MCP用のECRとIAMだけを作る。
 `apply` とECRへのpushは、実行前に対象とplanを確認する。
 
 ```sh
@@ -79,6 +80,45 @@ terraform -chdir=terraform output -raw web_url
 
 `web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送ると設定したモードで実行する。
 state、tfvars、plan、ZIP、実行結果はGitに含めない。
+
+## MCPの配備
+
+数値比較MCPはエージェントと別のECR・実行ロール・AgentCore Runtime V2に配置する。
+プロトコルは `MCP`、認証はIAM SigV4。CognitoやOAuthのリソースは追加しない。
+`mcp_image_digest` 未指定ならMCP用ECRとIAMのみ作成し、RuntimeやエージェントのMCP接続設定は作らない。
+
+1. `mcp_image_digest` を省略したplanを確認し、MCP用ECRとIAMを作成する。
+2. `mcp/` と `agent/` の両方のARM64イメージをビルドし、それぞれのECRへpushする。
+3. `terraform.tfvars` の `mcp_image_digest` と `agent_image_digest` を実際のダイジェストへ更新する。
+4. planでMCP Runtimeの追加、エージェントのイメージ・環境変数・呼び出し権限の更新を確認してapplyする。
+
+MCPイメージのビルド・pushはリポジトリ直下で実行する。ECRへのpushとapplyは事前に確認する。
+
+```sh
+MCP_REPO="$(terraform -chdir=terraform output -raw mcp_repository_url)"
+MCP_TAG="$(git rev-parse --short HEAD)"
+aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin "${MCP_REPO%%/*}"
+docker build --platform linux/arm64 -t "$MCP_REPO:$MCP_TAG" mcp
+docker push "$MCP_REPO:$MCP_TAG"
+aws ecr describe-images --region ap-northeast-1 --repository-name agent-mcp-apps/mcp --image-ids imageTag="$MCP_TAG" --query 'imageDetails[0].imageDigest' --output text
+```
+
+エージェントも「初期セットアップ」のコマンドでビルド・pushする。
+古いエージェントイメージのままでは `MCP_RUNTIME_ARN` を設定しても接続しない。
+Terraform自身はビルド・pushを実行しない。
+
+```hcl
+mcp_image_digest   = "sha256:MCPイメージの64桁のダイジェスト"
+agent_image_digest = "sha256:MCP接続対応エージェントの64桁のダイジェスト"
+```
+
+Terraformがエージェントに `MCP_RUNTIME_ARN` を渡し、その実行ロールへ対象RuntimeとDEFAULTエンドポイントの
+`bedrock-agentcore:InvokeAgentRuntime` のみを追加する。MCP側のロールにはMCPイメージとログへの権限だけを付ける。
+MCP Runtimeは `prevent_destroy` のため、作成後にダイジェストをnullへ戻して削除する操作は拒否される。
+
+`mcp_runtime_arn` を使った接続確認は [MCPのREADME](../mcp/README.md#agentcoreへの配備)を参照。
+ローカルのfixtureで接続すればモデルAPIは呼ばないが、AgentCoreの利用料金は発生し得る。
+AWS上のIAM認可とV2復元後の動作は配備後に検証する。MCP Apps対応はこの配備設定には含まない。
 
 ## さくらのAPIキーを指定する
 

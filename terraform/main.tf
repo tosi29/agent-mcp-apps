@@ -82,6 +82,9 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     local.sakura_enabled ? {
       SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
       SAKURA_MODEL_ID               = var.sakura_model_id == null ? "" : var.sakura_model_id
+    } : {},
+    var.mcp_image_digest != null ? {
+      MCP_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.mcp[0].agent_runtime_arn
     } : {}
   )
 
@@ -107,7 +110,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     }
   }
 
-  depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter]
+  depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter, aws_iam_role_policy.agent_mcp]
 }
 
 resource "aws_iam_role_policy" "sakura_parameter" {
