@@ -175,7 +175,7 @@ push・apply・実API検証は実行前に確認する。SSMの実権限とさ�
 apply前に、さくらと同じ条件でSecureStringを `/agent-mcp-apps/tavily-api-key` に事前作成する。
 別の名前を使う場合は `terraform.tfvars` の `tavily_api_key_parameter_name` で指定する。
 
-AgentCoreでは `web_search` が常に登録される。パラメータがなければ、そのツール呼び出しだけが失敗する。
+AgentCoreでは `web_search` と `web_fetch` が常に登録される。パラメータがなければ、そのツール呼び出しだけが失敗する。
 実行ロールにはそのパラメータ1つの `ssm:GetParameter` だけを付与する。
 キーはAgentCoreがツールの実行ごとに取得し、Terraform・Next.jsは値を扱わない。
 対応するエージェントイメージのpushと、push・apply・実API検証前の確認はさくらの場合と同じ。

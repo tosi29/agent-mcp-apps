@@ -16,9 +16,14 @@ from exploration_agent.runtime import build_tools
 from exploration_agent.server import create_app
 from exploration_agent.web_search import (
     MAX_CONTENT_CHARS,
+    MAX_FETCHES_PER_RUN,
+    MAX_PAGE_CHARS,
     MAX_RESULTS,
     MAX_SEARCHES_PER_RUN,
+    MAX_URL_CHARS,
+    build_web_fetch_tool,
     build_web_search_tool,
+    build_web_tools,
 )
 
 KEY = "tvly-private-test-key"
@@ -39,13 +44,14 @@ def found(results):
 
 
 def test_tool_is_registered_only_when_a_key_source_is_configured(monkeypatch):
-    assert [t.tool_name for t in build_tools()[1:]] == ["web_search"]
-    assert "query" in build_tools()[1].tool_spec["inputSchema"]["json"]["properties"]
-    assert len(build_tools()[1].tool_spec["inputSchema"]["json"]["properties"]) == 1
+    search, fetch = build_tools()[1:]
+    assert search.tool_name == "web_search" and fetch.tool_name == "web_fetch"
+    assert list(search.tool_spec["inputSchema"]["json"]["properties"]) == ["query"]
+    assert list(fetch.tool_spec["inputSchema"]["json"]["properties"]) == ["url"]
     monkeypatch.delenv("TAVILY_API_KEY")
     assert len(build_tools()) == 1
     monkeypatch.setenv("TAVILY_API_KEY_PARAMETER_NAME", "/test/tavily")
-    assert [t.tool_name for t in build_tools()[1:]] == ["web_search"]
+    assert [t.tool_name for t in build_tools()[1:]] == ["web_search", "web_fetch"]
 
 
 def test_request_is_fixed_by_the_app_and_result_is_projected():
@@ -174,26 +180,96 @@ def test_unavailable_parameter_fails_the_tool_only(monkeypatch, value):
         build_web_search_tool(transport=tavily(found([])))(query="q")
 
 
-async def test_agui_run_uses_web_search_and_reports_its_status(monkeypatch):
+PAGE_URL = "https://example.com/a"
+
+
+def tavily_site(page):
+    """Answer search with PAGE_URL and extract with the given page body."""
+
+    def handle(request):
+        if request.url.path == "/search":
+            return httpx2.Response(
+                200, json={"results": [{"title": "題", "url": PAGE_URL, "content": "抜粋"}]}
+            )
+        return httpx2.Response(200, json=page)
+
+    return tavily(handle)
+
+
+def test_fetch_works_without_a_search_and_page_is_truncated():
+    requests = []
+    site = tavily_site({"results": [{"url": PAGE_URL, "raw_content": "x" * (MAX_PAGE_CHARS + 1)}]})
+
+    def handle(request):
+        requests.append(request)
+        return site.handle_request(request)
+
+    result = build_web_fetch_tool(transport=tavily(handle))(url=PAGE_URL)
+    assert len(requests) == 1
+    assert str(requests[0].url) == "https://api.tavily.com/extract"
+    assert requests[0].headers["authorization"] == f"Bearer {KEY}"
+    assert json.loads(requests[0].content) == {
+        "urls": [PAGE_URL],
+        "extract_depth": "basic",
+        "format": "markdown",
+        "include_images": False,
+        "include_favicon": False,
+    }
+    assert result["content"] == "x" * MAX_PAGE_CHARS and result["truncated"] is True
+    assert "未検証" in result["notice"] and result["url"] == PAGE_URL
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["", "file:///etc/passwd", "javascript:alert(1)", "https://a.test/" + "x" * MAX_URL_CHARS],
+)
+def test_fetch_rejects_non_web_urls_without_calling_tavily(url):
+    def handle(request):
+        raise AssertionError("Tavily must not be called")
+
+    with pytest.raises(ValueError, match="url"):
+        build_web_fetch_tool(transport=tavily(handle))(url=url)
+
+
+def test_fetch_budget_applies_per_run_and_does_not_carry_over():
+    page = {"results": [{"url": PAGE_URL, "raw_content": "本文"}]}
+    fetch = build_web_fetch_tool(transport=tavily_site(page))
+    for _ in range(MAX_FETCHES_PER_RUN):
+        fetch(url=PAGE_URL)
+    with pytest.raises(ValueError, match="上限"):
+        fetch(url=PAGE_URL)
+    assert build_web_fetch_tool(transport=tavily_site(page))(url=PAGE_URL)["content"] == "本文"
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"results": [], "failed_results": [{"url": PAGE_URL, "error": f"private {KEY}"}]},
+        {"results": [{"url": PAGE_URL, "raw_content": "  "}]},
+        {"results": [{"url": PAGE_URL}]},
+        {"results": ["not-a-result"]},
+    ],
+)
+def test_fetch_failure_is_generic_and_does_not_leak(page, caplog):
+    with pytest.raises(RuntimeError, match="^Webページの取得に失敗しました$") as error:
+        build_web_fetch_tool(transport=tavily_site(page))(url=PAGE_URL)
+    assert error.value.__cause__ is None and error.value.__suppress_context__
+    assert KEY not in str(error.value) and KEY not in caplog.text
+
+
+async def test_agui_run_fetches_a_found_page_and_reports_status(monkeypatch):
+    page = {"results": [{"url": PAGE_URL, "raw_content": "ページ本文"}]}
     monkeypatch.setattr(
-        runtime,
-        "build_web_search_tool",
-        partial(
-            build_web_search_tool,
-            transport=tavily(
-                found([{"title": "題", "url": "https://example.com/a", "content": "抜粋"}])
-            ),
-        ),
+        runtime, "build_web_tools", partial(build_web_tools, transport=tavily_site(page))
     )
     requests = []
 
     def handle(request):
         requests.append(json.loads(request.content))
-        answer = (
-            completion(tool_message("web_search", {"query": "地価"}), "tool_calls")
-            if len(requests) == 1
-            else completion({"role": "assistant", "content": "完了"}, "stop")
-        )
+        answer = {
+            1: completion(tool_message("web_search", {"query": "地価"}), "tool_calls"),
+            2: completion(tool_message("web_fetch", {"url": PAGE_URL}), "tool_calls"),
+        }.get(len(requests), completion({"role": "assistant", "content": "完了"}, "stop"))
         return response(answer, True)
 
     async with AsyncOpenAI(
@@ -211,10 +287,18 @@ async def test_agui_run_uses_web_search_and_reports_its_status(monkeypatch):
             reply = await client.post("/invocations", json=run_input())
     events = decode_sse(reply.text)
     assert events[-1]["type"] == "RUN_FINISHED", events
-    assert [t["function"]["name"] for t in requests[0]["tools"]] == ["echo_text", "web_search"]
-    tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
-    assert json.loads(tool_result["content"])["results"][0]["url"] == "https://example.com/a"
-    status = next(e["value"] for e in events if e.get("name") == "tool_status")
-    assert status["name"] == "web_search" and status["status"] == "success"
+    assert [t["function"]["name"] for t in requests[0]["tools"]] == [
+        "echo_text",
+        "web_search",
+        "web_fetch",
+    ]
+    searched, fetched = [m for m in requests[-1]["messages"] if m["role"] == "tool"]
+    assert json.loads(searched["content"])["results"][0]["url"] == PAGE_URL
+    assert json.loads(fetched["content"])["content"] == "ページ本文"
+    statuses = [e["value"] for e in events if e.get("name") == "tool_status"]
+    assert [(s["name"], s["status"]) for s in statuses] == [
+        ("web_search", "success"),
+        ("web_fetch", "success"),
+    ]
     assert not any(e.get("name") == "data_result" for e in events)
     assert KEY not in reply.text

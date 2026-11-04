@@ -12,7 +12,7 @@
 - Terraformには有効・無効を切り替える条件分岐を新たに足さない。新しいリソースは常に作成し、値は変数の既定値で与える。`terraform test` のテストは書かない。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
-- MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルと、キー設定時のみ登録するTavilyのweb_search。データ探索のツールをPython側へ増やさない。
+- MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルと、キー設定時のみ登録するTavilyのweb_search・web_fetch。データ探索のツールをPython側へ増やさない。
 - MCP Appsは右ペインのsandboxで描画する。ADKは実装範囲に含めない。クラウドのsandbox配備や構成の重要な変更は相談する。
 - クラウドのsandboxは専用API Gatewayの `GET /poc/sandbox` を既存Next.js Lambdaへ接続する。同じ送信元IP制限と別オリジンを維持し、URLはTerraformから実行時環境変数へ渡す。HTML・中継処理はローカルproxyと共用し、起動・ビルドスクリプトを増やさない。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
@@ -39,8 +39,9 @@
 
 - 推論APIキーはローカルでは `agent/.env`、AgentCoreでは事前作成したParameter StoreのSecureStringを使う。Next.js側やブラウザへコピーしない。
 - Parameter Storeの値をTerraformで取得・管理しない。AgentCore V2の起動時にキーを取得せず、各runで取得してモデルに渡す。プロセスの環境変数やファイルへコピーしない。
-- TavilyのAPIキーも同じ扱いで、ローカルは `agent/.env`、AgentCoreはSecureStringを使う。推論キーと異なり、`web_search` の実行ごとに取得する。
+- TavilyのAPIキーも同じ扱いで、ローカルは `agent/.env`、AgentCoreはSecureStringを使う。推論キーと異なり、`web_search`・`web_fetch` の実行ごとに取得する。
 - `web_search` でモデルに渡す引数は `query` のみとし、取得件数・抜粋長・回数の上限をアプリ側で固定する。検索クエリは外部へ送られ、検索結果は未検証データとして扱う。
+- `web_fetch` でモデルに渡す引数は `url` のみとする。取得先のサイトはPoCとして制限しないが、取得はTavily Extract経由とし、エージェントから直接通信しない。本文の長さと回数の上限はアプリ側で固定し、本文も未検証データとして扱う。実データの導入前にURLの制限を見直す。
 - `.env`、実データ、実行ログ、Terraform state等をコミットしない。キーや認証ヘッダーをログ・ツール出力・資料へ表示しない。
 - エージェントとMCPのログ・トレース・メトリクスは有効にする。通常のローカル起動ではstderr、AgentCoreではADOT経由でCloudWatchへ出す。質問・回答・ツール引数・結果も記録対象とするが、キーや認証ヘッダーは記録しない。
 - フロントの利用状況テレメトリ無効化は維持し、起動・ビルドにはnpmスクリプトを使う。`DO_NOT_TRACK` を全通信の遮断機能とはみなさない。
