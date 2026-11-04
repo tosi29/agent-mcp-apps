@@ -9,6 +9,7 @@
 - `agent/`：Strands Agents・Pythonツールのechoサンプル・AG-UIサーバー。構成管理はuv。
 - `mcp/`：探索4ツール・MCP AppsのダッシュボードとDuckDB・Parquet・結果保存を持つMCPサーバー。Python・uvで管理し、`mcp/ui/` のHTMLビルドはnpmで管理する。
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
+- Terraformには有効・無効を切り替える条件分岐を新たに足さない。新しいリソースは常に作成し、値は変数の既定値で与える。`terraform test` のテストは書かない。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
 - MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルと、キー設定時のみ登録するTavilyのweb_search。データ探索のツールをPython側へ増やさない。
