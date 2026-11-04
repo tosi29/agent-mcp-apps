@@ -42,6 +42,17 @@ variable "sakura_model_id" {
   }
 }
 
+variable "tavily_api_key_parameter_name" {
+  description = "事前作成したTavily APIキーのSecureStringパラメータ名。値はTerraformで取得・管理しない。"
+  type        = string
+  default     = "/agent-mcp-apps/tavily-api-key"
+
+  validation {
+    condition     = can(regex("^/?[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", var.tavily_api_key_parameter_name))
+    error_message = "SSMパラメータ名を指定してください。ARN、ワイルドカード、空文字は使えません。"
+  }
+}
+
 variable "allowed_source_cidrs" {
   description = "ブラウザ検証を許可する送信元CIDR。terraform.tfvarsで利用端末のグローバルIPv4/32等を指定する。"
   type        = set(string)

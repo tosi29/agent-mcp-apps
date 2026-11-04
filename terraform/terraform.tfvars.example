@@ -8,3 +8,6 @@
 # さくらを使う場合のみ指定。SecureStringの作成・値の登録はTerraformの外で行う。
 # sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
 # sakura_model_id = "利用するモデルID"
+
+# TavilyのSecureStringの作成・値の登録はTerraformの外で行う。既定と異なる名前を使う場合のみ指定する。
+# tavily_api_key_parameter_name = "/agent-mcp-apps/tavily-api-key"

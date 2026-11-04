@@ -108,6 +108,8 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     {
       EXPLORER_MODEL_MODE = local.sakura_enabled ? "sakura" : "fixture"
       OTEL_SERVICE_NAME   = local.agent_name
+
+      TAVILY_API_KEY_PARAMETER_NAME = var.tavily_api_key_parameter_name
     },
     local.sakura_enabled ? {
       SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
@@ -140,7 +142,20 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     }
   }
 
-  depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter, aws_iam_role_policy.agent_mcp]
+  depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter, aws_iam_role_policy.tavily_parameter, aws_iam_role_policy.agent_mcp]
+}
+
+resource "aws_iam_role_policy" "tavily_parameter" {
+  name = "read_tavily_api_key_parameter"
+  role = aws_iam_role.agent.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:${local.partition}:ssm:ap-northeast-1:${local.account_id}:parameter/${trimprefix(var.tavily_api_key_parameter_name, "/")}"
+    }]
+  })
 }
 
 resource "aws_iam_role_policy" "sakura_parameter" {

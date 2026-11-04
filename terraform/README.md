@@ -170,6 +170,16 @@ SSM対応の新しいエージェントイメージを `node scripts/push-images
 旧fixture専用イメージのまま設定だけを変更しない。Next.jsの接続モード表示も更新するため、Web用ZIPも再ビルド・配備する。
 push・apply・実API検証は実行前に確認する。SSMの実権限とさくらの応答は、デプロイ後の検証が必要。
 
+## TavilyのAPIキーを指定する
+
+apply前に、さくらと同じ条件でSecureStringを `/agent-mcp-apps/tavily-api-key` に事前作成する。
+別の名前を使う場合は `terraform.tfvars` の `tavily_api_key_parameter_name` で指定する。
+
+AgentCoreでは `web_search` が常に登録される。パラメータがなければ、そのツール呼び出しだけが失敗する。
+実行ロールにはそのパラメータ1つの `ssm:GetParameter` だけを付与する。
+キーはAgentCoreがツールの実行ごとに取得し、Terraform・Next.jsは値を扱わない。
+対応するエージェントイメージのpushと、push・apply・実API検証前の確認はさくらの場合と同じ。
+
 ## 動作確認
 
 ローカルの起動と型チェックは [app/README.md](../app/README.md) を参照する。
