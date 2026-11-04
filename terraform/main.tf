@@ -110,6 +110,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
       OTEL_SERVICE_NAME   = local.agent_name
 
       TAVILY_API_KEY_PARAMETER_NAME = var.tavily_api_key_parameter_name
+      DOCS_MCP_ENABLED              = "true"
     },
     local.sakura_enabled ? {
       SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name

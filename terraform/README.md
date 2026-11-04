@@ -180,6 +180,11 @@ AgentCoreでは `web_search` と `web_fetch` が常に登録される。パラ�
 キーはAgentCoreがツールの実行ごとに取得し、Terraform・Next.jsは値を扱わない。
 対応するエージェントイメージのpushと、push・apply・実API検証前の確認はさくらの場合と同じ。
 
+## AWS・Azureのドキュメント用MCP
+
+AgentCoreのエージェントには `DOCS_MCP_ENABLED=true` を常に渡す。認証情報・追加のIAM権限・パラメータは不要。
+接続先は [agentのREADME](../agent/README.md#awsazureのドキュメント用mcp) を参照。
+
 ## 動作確認
 
 ローカルの起動と型チェックは [app/README.md](../app/README.md) を参照する。
