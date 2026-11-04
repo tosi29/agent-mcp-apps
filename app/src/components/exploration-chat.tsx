@@ -10,6 +10,7 @@ import { McpAppResultView } from "./mcp-app-result";
 
 const toolNames: Record<string, string> = {
   echo_text: "入力を返す（Pythonサンプル）",
+  web_search: "Webを検索（Tavily）",
   describe_dataset: "データ項目を確認",
   search_transactions: "条件に合う取引を検索",
   aggregate_transactions: "取引データを集計",

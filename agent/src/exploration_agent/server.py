@@ -83,10 +83,11 @@ async def _agui_events(
             yield CustomEvent(type=EventType.CUSTOM, name="tool_status", value=status)
 
     hooks = RequestHooks(observe, max_model_calls)
+    tools = build_tools() + mcp_tools
     template = Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=build_tools() + mcp_tools,
+        tools=tools,
         callback_handler=log_callback,
         retry_strategy=None,
     )
@@ -96,11 +97,7 @@ async def _agui_events(
         hooks=[hooks, MCPPreviewHook(observe, app_loader)],
         config=StrandsAgentConfig(
             tool_behaviors={
-                name: ToolBehavior(custom_result_handler=custom_result)
-                for name in [
-                    "echo_text",
-                    *(tool.tool_name for tool in mcp_tools),
-                ]
+                tool.tool_name: ToolBehavior(custom_result_handler=custom_result) for tool in tools
             },
             # Explicitly preserve no-retry behavior when the adapter clones the template.
             thread_agent_kwargs=lambda _: {

@@ -10,7 +10,7 @@ Browser / Next.js + CopilotKit
   → AG-UI / FastAPI
     → Strands Agents → さくらAI Engine
       ├─ MCPツール → DuckDB → ローカルParquet
-      └─ Pythonツール → echo_text（接続検証サンプル）
+      └─ Pythonツール → echo_text（接続検証サンプル）、web_search（任意・Tavily）
 ```
 
 | ディレクトリ | 役割 |
@@ -84,6 +84,7 @@ uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/m
 
 ローカルのAPIキーは `agent/.env` に置く。AWSでは事前作成したParameter StoreのSecureString名を指定する。
 質問・会話履歴・ツール結果の要約が推論APIへ送られる。
+TavilyのAPIキーを設定した場合はWeb検索が有効になり、検索クエリがTavilyへ送られる。詳細は [Web検索](agent/README.md#web検索tavily) を参照。
 モデルの利用可否・無償枠は利用者のアカウントで確認する。
 
 ## 制約と詳細
@@ -97,7 +98,7 @@ Lambda用ZIPは `npm --prefix app run build:lambda`、エージェント・MCP�
 `node scripts/push-images.mjs all` で実行する。片方なら引数を `agent` または `mcp` にする。
 ECRスクリプトはダイジェストのJSONを更新する。配備は別途plan・applyで行う。
 
-探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textのみ。
+探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textと、キー設定時のweb_search。
 加えて `show_transaction_dashboard` がMCP AppsのUIを提供する。構成と起動方法は [mcp/README.md](mcp/README.md) を参照。
 クラウドのsandboxは専用API Gatewayの `/poc/sandbox` から配信する。
 チャットと同じNext.js Lambdaを共用し、別オリジンと同じ送信元IP制限を使う。

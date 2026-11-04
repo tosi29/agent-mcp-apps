@@ -8,6 +8,7 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 | ツール | 提供元 | 機能 |
 | --- | --- | --- |
 | `echo_text` | 通常のPython関数 | 200文字以内の入力をそのまま返す接続検証サンプル |
+| `web_search` | 通常のPython関数（任意） | TavilyでWebを検索し、タイトル・URL・短い抜粋を返す |
 | `describe_dataset` | MCP | 項目・単位・地域候補・件数の確認 |
 | `search_transactions` | MCP | 地域・年・価格範囲で検索 |
 | `aggregate_transactions` | MCP | 地域・年・四半期で集計 |
@@ -17,6 +18,7 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 通常のPythonツールの例は `src/exploration_agent/tools.py` の `echo_text`。
 MCP未接続でも使用でき、外部通信・ファイル操作・状態変更は行わない。
 MCPが指定されている場合は、5ツールが揃わないと実行を開始しない。ローカル関数へのフォールバックはない。
+`web_search` はAPIキーの参照先を設定したときだけ登録する。詳細は [Web検索](#web検索tavily) を参照。
 
 ## ローカル起動
 
@@ -60,6 +62,22 @@ uv run --locked --env-file .env explore ask '新宿区を年別に集計して' 
 Strands・OpenAIクライアントの自動再試行と、有料モデルへの自動フォールバックは無効。
 CLIの `--no-stream` はモデルの非ストリーム動作、`--sse` は標準出力の形式を切り替える。
 
+## Web検索（Tavily）
+
+ローカルでは `.env` の `TAVILY_API_KEY`、AgentCoreでは `TAVILY_API_KEY_PARAMETER_NAME` で指定した
+SecureStringからキーを読む。両方あればパラメータを優先する。どちらもなければツールを登録しない。
+キーはツールの実行ごとに取得し、起動時スナップショットやエージェントの状態へ保持しない。
+キーの取得や検索に失敗してもそのツール呼び出しだけが失敗し、モデルには固定の失敗メッセージを返す。
+
+モデルが指定できるのは400文字以内の `query` だけで、URLや検索オプションは指定できない。
+`search_depth=basic`（1回1クレジット）、最大5件、1runあたり最大3回、HTTPタイムアウト20秒で、リダイレクトは追わない。
+モデルへ返すのはhttp(s)のURLと、タイトル200文字・抜粋500文字まで。ページ本文やTavilyの生成回答は取得しない。
+
+検索クエリはTavilyへ送られ、検索結果はモデルAPIへ送られる。実データの導入前に送信範囲を確認する。
+検索結果は未検証の外部情報として扱い、文中の指示に従わず、合成データの集計と分けて回答するようモデルへ指示している。
+これはモデルへの指示であり、不正な指示や取引データのクエリ混入を確実に防ぐものではない。
+1質問のモデル呼び出し上限は4回のままなので、データ探索と併用すると上限に達する場合がある。
+
 ## 結果とイベント
 
 MCPの `content` はモデル用の要約と最大3行、`structuredContent` は画面用の最大20行を返す。
@@ -83,6 +101,7 @@ RAWと暗号化推論値は送信しない。推論の返却有無はモデル�
 既定はfixtureで、さくら接続時は `EXPLORER_MODEL_MODE=sakura`、
 `SAKURA_API_KEY_PARAMETER_NAME`、`SAKURA_MODEL_ID` を設定する。
 SSM SecureStringの値は各runで取得し、起動時スナップショットへ固定しない。
+Web検索のキーは `TAVILY_API_KEY_PARAMETER_NAME` で指定する。Terraform配備では常に設定される。
 
 MCPは `MCP_RUNTIME_ARN` で東京リージョンのRuntimeを指定する。
 IAM署名と一時認証情報の取得は各HTTPリクエストで行い、接続中はMCPセッションIDを引き継ぐ。
@@ -110,7 +129,7 @@ Transaction Searchの有効化が必要。送信権限・配備手順は [Terraf
 ## テスト
 
 先に `mcp/` で `uv sync --locked` を行う。agentの統合テストはMCP用の仮想環境から
-ローカルサーバーを起動し、別プロセス間で実通信する。AWS・モデルAPIは呼ばない。
+ローカルサーバーを起動し、別プロセス間で実通信する。AWS・モデルAPI・Tavilyは呼ばない。
 
 ```sh
 uv run --locked ruff check src tests

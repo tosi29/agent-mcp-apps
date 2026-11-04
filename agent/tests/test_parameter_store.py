@@ -6,7 +6,7 @@ import pytest
 from botocore.stub import Stubber
 from test_server import decode_sse, run_input
 
-from exploration_agent import parameter_store
+from exploration_agent import parameter_store, secure_parameter
 from exploration_agent.agentcore_server import create_agentcore_app
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.runtime import SakuraSettings
@@ -29,7 +29,7 @@ def ssm(monkeypatch):
         sessions.append(kwargs)
         return SimpleNamespace(client=lambda *args, **kwargs: client)
 
-    monkeypatch.setattr(parameter_store.boto3, "Session", session)
+    monkeypatch.setattr(secure_parameter.boto3, "Session", session)
     monkeypatch.setenv("EXPLORER_MODEL_MODE", "sakura")
     monkeypatch.setenv("SAKURA_API_KEY_PARAMETER_NAME", NAME)
     monkeypatch.setenv("SAKURA_MODEL_ID", "test-model")
