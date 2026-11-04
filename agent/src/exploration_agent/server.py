@@ -20,6 +20,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from strands import Agent
 from strands.models.model import Model
 
+from exploration_agent.docs_mcp import DocsMCPHook, build_docs_clients, managed_agent
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_apps import load_app_resources
 from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
@@ -41,14 +42,22 @@ async def agui_events(
     timeout_seconds: float = 120,
 ) -> AsyncIterator:
     deadline = asyncio.get_running_loop().time() + timeout_seconds
-    async with connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as tools:
+    async with (
+        connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as tools,
+        managed_agent(
+            model=model,
+            system_prompt=SYSTEM_PROMPT,
+            tools=build_tools() + tools + build_docs_clients(),
+            callback_handler=log_callback,
+            retry_strategy=None,
+        ) as template,
+    ):
         remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
             raise TimeoutError("MCP connection exceeded the request budget")
         async for event in _agui_events(
             run,
-            model,
-            mcp_tools=tools,
+            template,
             app_loader=partial(load_app_resources, tools, mcp_url, mcp_runtime_arn),
             max_model_calls=max_model_calls,
             timeout_seconds=remaining,
@@ -58,9 +67,8 @@ async def agui_events(
 
 async def _agui_events(
     run: RunAgentInput,
-    model: Model,
+    template: Agent,
     *,
-    mcp_tools: list,
     app_loader: Callable[[], Awaitable[dict[str, dict]]],
     max_model_calls: int,
     timeout_seconds: float,
@@ -83,21 +91,14 @@ async def _agui_events(
             yield CustomEvent(type=EventType.CUSTOM, name="tool_status", value=status)
 
     hooks = RequestHooks(observe, max_model_calls)
-    tools = build_tools() + mcp_tools
-    template = Agent(
-        model=model,
-        system_prompt=SYSTEM_PROMPT,
-        tools=tools,
-        callback_handler=log_callback,
-        retry_strategy=None,
-    )
     adapter = StrandsAgent(
         agent=template,
         name="explorer",
-        hooks=[hooks, MCPPreviewHook(observe, app_loader)],
+        hooks=[hooks, MCPPreviewHook(observe, app_loader), DocsMCPHook()],
         config=StrandsAgentConfig(
             tool_behaviors={
-                tool.tool_name: ToolBehavior(custom_result_handler=custom_result) for tool in tools
+                name: ToolBehavior(custom_result_handler=custom_result)
+                for name in template.tool_registry.registry
             },
             # Explicitly preserve no-retry behavior when the adapter clones the template.
             thread_agent_kwargs=lambda _: {

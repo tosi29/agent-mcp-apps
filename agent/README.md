@@ -20,6 +20,7 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 MCP未接続でも使用でき、外部通信・ファイル操作・状態変更は行わない。
 MCPが指定されている場合は、5ツールが揃わないと実行を開始しない。ローカル関数へのフォールバックはない。
 `web_search` と `web_fetch` はAPIキーの参照先を設定したときだけ登録する。詳細は [Web検索](#web検索tavily) を参照。
+AWS・Azureの公開ドキュメント用ツールは [リモートMCP](#awsazureのドキュメント用mcp) を参照。
 
 ## ローカル起動
 
@@ -86,6 +87,27 @@ SecureStringからキーを読む。両方あればパラメータを優先す�
 特に `web_fetch` のURLは任意のサイトへ届くため、ページ内の不正な指示に従うとデータが外部へ送られる可能性がある。実データの導入前に制限を見直す。
 1質問のモデル呼び出し上限は4回のままなので、データ探索と併用すると上限に達する場合がある。
 
+## AWS・Azureのドキュメント用MCP
+
+`DOCS_MCP_ENABLED=true` のとき、質問ごとに次の公開リモートMCPへ接続する。認証とキーは不要で、読み取り専用。
+未設定なら接続しない。fixtureの手順は `.env` を読まないため、外部へ接続しない。
+
+| 対象 | エンドポイント | 許可するツール |
+| --- | --- | --- |
+| AWS | `https://knowledge-mcp.global.api.aws` | `aws___search_documentation`・`aws___read_documentation`・`aws___list_regions`・`aws___get_regional_availability` |
+| Azure | `https://learn.microsoft.com/api/mcp` | `microsoft_docs_search`・`microsoft_docs_fetch`・`microsoft_code_sample_search` |
+
+URLとツールはコードで固定し、モデルや環境変数から変更できない。上記以外のツールはモデルへ公開しない。
+AWS MCP Server等の実環境を操作するMCPは接続しない。
+接続は5秒、ツール実行は20秒でタイムアウトし、別オリジンへのリダイレクトは追わない。
+2サーバー合計で1runあたり最大5回、モデルへ返す本文は1回8000文字まで。`structuredContent` とメタデータは除去する。
+接続に失敗したサーバーはそのrunで使わず、警告ログを残して他のツールで続行する。
+
+検索語と取得するURLはAWS・Microsoftへ送られ、結果はモデルAPIへ送られる。実データの導入前に送信範囲を確認する。
+取得先URLの制限は各サーバーの許可リストに任せ、エージェント側では検査しない。
+結果とツールの説明文は外部から受け取るため、不正な指示の混入を確実には防げない。
+結果には未検証である旨を付け、文中の指示に従わないようモデルへ指示している。
+
 ## 結果とイベント
 
 MCPの `content` はモデル用の要約と最大3行、`structuredContent` は画面用の最大20行を返す。
@@ -113,7 +135,7 @@ Web検索のキーは `TAVILY_API_KEY_PARAMETER_NAME` で指定する。Terrafor
 
 MCPは `MCP_RUNTIME_ARN` で東京リージョンのRuntimeを指定する。
 IAM署名と一時認証情報の取得は各HTTPリクエストで行い、接続中はMCPセッションIDを引き継ぐ。
-起動・`/ping` ではMCPへ接続しない。任意の外部MCP URLやHTTPリダイレクトは許可しない。
+起動・`/ping` ではMCPへ接続しない。コードで固定したドキュメント用以外の外部MCP URLやHTTPリダイレクトは許可しない。
 ローカルから同じMCPを試す場合は `--mcp-runtime-arn 'Runtime ARN'` を使う。
 `--mcp-url` との同時指定はできない。fixtureでもAgentCoreへの実接続には料金が発生し得る。
 

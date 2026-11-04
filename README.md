@@ -10,7 +10,8 @@ Browser / Next.js + CopilotKit
   → AG-UI / FastAPI
     → Strands Agents → さくらAI Engine
       ├─ MCPツール → DuckDB → ローカルParquet
-      └─ Pythonツール → echo_text（接続検証サンプル）、web_search・web_fetch（任意・Tavily）
+      ├─ Pythonツール → echo_text（接続検証サンプル）、web_search・web_fetch（任意・Tavily）
+      └─ リモートMCP（任意） → AWS Knowledge・Microsoft Learnの公開ドキュメント
 ```
 
 | ディレクトリ | 役割 |
