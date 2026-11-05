@@ -10,6 +10,7 @@ from strands.models.model import Model
 
 from exploration_agent.mcp_clients.docs import build_docs_clients
 from exploration_agent.mcp_clients.exploration import build_mcp_clients
+from exploration_agent.mcp_clients.target import MCPTarget
 from exploration_agent.observability import log_callback
 from exploration_agent.tools.echo import echo_text
 from exploration_agent.tools.web import build_web_tools, web_search_enabled
@@ -53,16 +54,11 @@ async def managed_agent(**kwargs: Any) -> AsyncIterator[Agent]:
         await asyncio.to_thread(agent.cleanup)
 
 
-def exploration_agent(
-    model: Model,
-    *,
-    mcp_url: str | None = None,
-    mcp_runtime_arn: str | None = None,
-):
+def exploration_agent(model: Model, mcp: MCPTarget | None):
     return managed_agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=build_tools() + build_mcp_clients(mcp_url, mcp_runtime_arn) + build_docs_clients(),
+        tools=build_tools() + build_mcp_clients(mcp) + build_docs_clients(),
         callback_handler=log_callback,
         retry_strategy=None,
     )

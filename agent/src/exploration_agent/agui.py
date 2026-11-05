@@ -16,6 +16,7 @@ from exploration_agent.agent import exploration_agent
 from exploration_agent.hooks import ToolResultHook
 from exploration_agent.mcp_clients.apps import load_app_resources
 from exploration_agent.mcp_clients.docs import DocsMCPHook
+from exploration_agent.mcp_clients.target import MCPTarget
 from exploration_agent.observability import log_callback
 
 logger = logging.getLogger(__name__)
@@ -68,8 +69,7 @@ async def agui_events(
     run: RunAgentInput,
     model_factory: Callable[[], Model],
     *,
-    mcp_url: str | None = None,
-    mcp_runtime_arn: str | None = None,
+    mcp: MCPTarget | None = None,
     timeout_seconds: float = 300,
 ) -> AsyncIterator:
     """Stream one run. Every failure ends it once, with a fixed message for the client."""
@@ -79,12 +79,8 @@ async def agui_events(
     try:
         # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
         model = await asyncio.to_thread(model_factory)
-        async with exploration_agent(
-            model, mcp_url=mcp_url, mcp_runtime_arn=mcp_runtime_arn
-        ) as template:
-            adapter = _build_adapter(
-                template, partial(load_app_resources, mcp_url, mcp_runtime_arn)
-            )
+        async with exploration_agent(model, mcp) as template:
+            adapter = _build_adapter(template, partial(load_app_resources, mcp))
             async with aclosing(adapter.run(_trusted_input(run))) as stream:
                 while True:
                     # The endpoint runs each step in its own task, so asyncio.timeout()

@@ -16,6 +16,7 @@ from test_agui_run import completion, response, tool_message
 from exploration_agent.agui import agui_events
 from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_clients.target import local_target
 
 
 def run_input(**updates):
@@ -36,9 +37,9 @@ def decode_sse(body):
 
 
 async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
-    app = create_app(FixtureModel, mode="fixture", mcp_url=mcp_url)
+    app = create_app(FixtureModel, mode="fixture", mcp=local_target(mcp_url))
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as client:
         ping = await client.get("/ping")
         assert ping.json()["mode"] == "fixture"
@@ -88,7 +89,7 @@ async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
         )
         events = [
             e.model_dump(mode="json", by_alias=True)
-            async for e in agui_events(run, lambda: model, mcp_url=mcp_url)
+            async for e in agui_events(run, lambda: model, mcp=local_target(mcp_url))
         ]
     assert events[-1]["type"] == "RUN_FINISHED", events
     preview = next(e["value"] for e in events if e.get("name") == "data_result")
@@ -132,7 +133,7 @@ async def test_reasoning_reaches_ui_and_followup_excludes_it(tmp_path, streaming
             mode="test",
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             first = await client.post("/invocations", json=run_input())
             events = decode_sse(first.text)
@@ -167,7 +168,7 @@ async def test_reasoning_reaches_ui_and_followup_excludes_it(tmp_path, streaming
 async def test_host_and_content_type_are_rejected(tmp_path):
     app = create_app(FixtureModel, mode="fixture")
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as client:
         wrong_host = await client.post(
             "/invocations", json=run_input(), headers={"Host": "untrusted.invalid"}
@@ -193,7 +194,7 @@ async def test_system_messages_from_the_client_never_reach_model(tmp_path):
             mode="test",
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             reply = await client.post(
                 "/invocations",
@@ -214,7 +215,7 @@ async def test_setup_failure_is_terminal_without_exception_details(tmp_path):
 
     app = create_app(fail, mode="test")
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as client:
         reply = await client.post("/invocations", json=run_input())
     events = decode_sse(reply.text)
@@ -230,7 +231,7 @@ async def test_cleanup_failure_after_finish_does_not_reopen_the_run(tmp_path, mo
     monkeypatch.setattr(Agent, "cleanup", fail)
     app = create_app(FixtureModel, mode="fixture")
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as client:
         reply = await client.post("/invocations", json=run_input())
     events = decode_sse(reply.text)
@@ -255,7 +256,7 @@ async def test_timeout_applies_through_the_endpoint(tmp_path, monkeypatch):
     ) as model_client:
         app = create_app(lambda: OpenAIModel(client=model_client, model_id="mock"), mode="test")
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             started = time.monotonic()
             reply = await client.post("/invocations", json=run_input())
@@ -300,7 +301,7 @@ async def test_followup_replays_history_once_without_preview(tmp_path):
             mode="test",
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             first = await client.post("/invocations", json=run_input())
             snapshots = [e for e in decode_sse(first.text) if e["type"] == "MESSAGES_SNAPSHOT"]

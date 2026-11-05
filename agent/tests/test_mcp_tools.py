@@ -18,6 +18,7 @@ from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_clients import agentcore as agentcore_mcp
 from exploration_agent.mcp_clients.exploration import MCP_TOOL_NAMES, build_mcp_clients
+from exploration_agent.mcp_clients.target import local_target, runtime_target
 
 
 async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
@@ -26,7 +27,7 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
         async for event in agui_events(
             RunAgentInput.model_validate(run_input()),
             FixtureModel,
-            mcp_url=mcp_url,
+            mcp=local_target(mcp_url),
         )
     ]
     assert events[-1]["type"] == "RUN_FINISHED"
@@ -73,7 +74,7 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
             async for event in agui_events(
                 RunAgentInput.model_validate(run_input()),
                 lambda: OpenAIModel(client=client, model_id="mock"),
-                mcp_url=mcp_url,
+                mcp=local_target(mcp_url),
             )
         ]
     assert events[-1]["type"] == "RUN_FINISHED"
@@ -132,7 +133,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
             async for event in agui_events(
                 RunAgentInput.model_validate(run_input()),
                 lambda: OpenAIModel(client=client, model_id="mock", stream=not parallel),
-                mcp_url=mcp_url,
+                mcp=local_target(mcp_url),
             )
         ]
     assert events[-1]["type"] == "RUN_FINISHED"
@@ -160,10 +161,10 @@ async def test_unavailable_mcp_fails_without_falling_back(tmp_path, unused_tcp_p
     app = create_app(
         FixtureModel,
         mode="fixture",
-        mcp_url=f"http://127.0.0.1:{unused_tcp_port}/mcp",
+        mcp=local_target(f"http://127.0.0.1:{unused_tcp_port}/mcp"),
     )
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as client:
         result = await client.post("/invocations", json=run_input())
     events = decode_sse(result.text)
@@ -173,7 +174,7 @@ async def test_unavailable_mcp_fails_without_falling_back(tmp_path, unused_tcp_p
 
 def test_only_loopback_mcp_is_allowed():
     with pytest.raises(ValueError):
-        build_mcp_clients("https://example.com/mcp", None)
+        local_target("https://example.com/mcp")
 
 
 RUNTIME_ARN = "arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/comparison-AbCdEf1234"
@@ -227,7 +228,7 @@ async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
     for _ in range(2):
         returned_session = str(uuid4())
         # Use the real Strands adapter and MCP server, with only AWS HTTP ingress simulated.
-        client = build_mcp_clients(None, RUNTIME_ARN)[0]
+        client = build_mcp_clients(runtime_target(RUNTIME_ARN))[0]
         await asyncio.to_thread(client.start)
         try:
             tools = await asyncio.to_thread(client.list_tools_sync)
@@ -282,7 +283,7 @@ async def test_app_resource_session_is_signed_and_advertises_apps(mcp_url, monke
         "AsyncClient",
         lambda **kwargs: original_client(transport=httpx2.MockTransport(forward), **kwargs),
     )
-    app = await load_app_resources(None, RUNTIME_ARN)
+    app = await load_app_resources(runtime_target(RUNTIME_ARN))
     assert app["resourceUri"] == APP_URI
     assert app["mimeType"] == APP_MIME
     assert app["html"]
@@ -302,7 +303,7 @@ async def test_app_resource_session_is_signed_and_advertises_apps(mcp_url, monke
 )
 def test_invalid_runtime_arn_is_rejected_before_connecting(arn):
     with pytest.raises(ValueError):
-        build_mcp_clients(None, arn)
+        runtime_target(arn)
 
 
 async def test_runtime_auth_does_not_use_missing_credentials(monkeypatch):

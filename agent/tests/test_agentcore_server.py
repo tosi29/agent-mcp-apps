@@ -6,6 +6,7 @@ from exploration_agent.entrypoints import agentcore as agentcore_server
 from exploration_agent.entrypoints.agentcore import create_agentcore_app
 from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_clients.agentcore import runtime_url
 
 
 @pytest.fixture(autouse=True)
@@ -66,4 +67,4 @@ def test_agentcore_mcp_configuration_is_lazy(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agentcore_server, "create_app", capture)
     assert create_agentcore_app() == "app"
-    assert captured["mcp_runtime_arn"] == arn
+    assert captured["mcp"].url == runtime_url(arn)

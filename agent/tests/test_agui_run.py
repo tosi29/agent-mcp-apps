@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 
 from exploration_agent.agui import agui_events
+from exploration_agent.mcp_clients.target import local_target
 from exploration_agent.model import sakura_factory_from_env
 
 
@@ -148,7 +149,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
         model = OpenAIModel(client=client, model_id="mock", stream=streaming)
-        events = await collect(model, "合成データを検索", mcp_url=mcp_url)
+        events = await collect(model, "合成データを検索", mcp=local_target(mcp_url))
     assert len(requests) == 3
     search_spec = next(
         item["function"]
@@ -278,7 +279,9 @@ async def test_invalid_tool_input_reports_error_without_data(tmp_path, mcp_url):
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = await collect(OpenAIModel(client=client, model_id="mock"), mcp_url=mcp_url)
+        events = await collect(
+            OpenAIModel(client=client, model_id="mock"), mcp=local_target(mcp_url)
+        )
     assert custom(events, "data_result") == []
     assert custom(events, "tool_status")[0]["status"] == "error"
 
