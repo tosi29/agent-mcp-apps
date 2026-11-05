@@ -6,10 +6,11 @@ import pytest
 from botocore.stub import Stubber
 from test_server import decode_sse, run_input
 
-from exploration_agent import parameter_store, secure_parameter
-from exploration_agent.agentcore_server import create_agentcore_app
+from exploration_agent import model as parameter_store
+from exploration_agent import secure_parameter
+from exploration_agent.entrypoints.agentcore import create_agentcore_app
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.runtime import SakuraSettings
+from exploration_agent.model import SakuraSettings
 
 NAME = "/test/sakura-api-key"
 PARAMS = {"Name": NAME, "WithDecryption": True}

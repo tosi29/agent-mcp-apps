@@ -16,9 +16,9 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 | `compare_values` | MCP | 差分・増減率の計算 |
 | `show_transaction_dashboard` | MCP Apps | 棒グラフと表のダッシュボードを表示 |
 
-通常のPythonツールの例は `src/exploration_agent/tools.py` の `echo_text`。
+通常のPythonツールの例は `src/exploration_agent/tools/echo.py` の `echo_text`。
 MCP未接続でも使用でき、外部通信・ファイル操作・状態変更は行わない。
-MCPが指定されている場合は、5ツールが揃わないと実行を開始しない。ローカル関数へのフォールバックはない。
+MCPに接続できないと実行を開始しない。ローカル関数へのフォールバックはない。
 `web_search` と `web_fetch` はAPIキーの参照先を設定したときだけ登録する。詳細は [Web検索](#web検索tavily) を参照。
 AWS・Azureの公開ドキュメント用ツールは [リモートMCP](#awsazureのドキュメント用mcp) を参照。
 
@@ -63,6 +63,21 @@ uv run --locked --env-file .env explore ask '新宿区を年別に集計して' 
 モデル呼び出しの回数は制限せず、各回 `max_tokens=2048`、HTTPタイムアウト60秒、1質問全体で300秒。
 Strands・OpenAIクライアントの自動再試行と、有料モデルへの自動フォールバックは無効。
 CLIの `--no-stream` はモデルの非ストリーム動作、`--sse` は標準出力の形式を切り替える。
+
+## ディレクトリ構成
+
+```text
+src/exploration_agent/
+├── agent.py             # プロンプトとツールの組み立て。全入口で共通のエージェント定義
+├── hooks.py             # 実行回数の集計とツールイベント
+├── model.py             # さくらのモデル設定
+├── fixture_model.py     # 外部API不要の固定応答
+├── secure_parameter.py  # Parameter Storeの遅延読み込み
+├── observability.py     # ログ・トレース・メトリクス
+├── entrypoints/         # 起動の入口：server（AG-UI）、agui（イベント変換）、agentcore、cli
+├── tools/               # 通常のPythonツール：echo、web（web_search・web_fetch）
+└── mcp_clients/         # MCPへの接続：exploration、apps、docs、agentcore（SigV4署名）
+```
 
 ## Web検索（Tavily）
 

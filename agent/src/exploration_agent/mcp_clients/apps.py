@@ -3,7 +3,7 @@
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from exploration_agent.agentcore_mcp import runtime_transport
+from exploration_agent.mcp_clients.agentcore import runtime_transport
 
 APP_TOOL = "show_transaction_dashboard"
 APP_URI = "ui://exploration/transaction-dashboard-v1.html"

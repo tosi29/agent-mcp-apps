@@ -1,10 +1,10 @@
 import httpx
 from test_server import decode_sse, run_input
 
-from exploration_agent import agentcore_server
-from exploration_agent.agentcore_server import create_agentcore_app
+from exploration_agent.entrypoints import agentcore as agentcore_server
+from exploration_agent.entrypoints.agentcore import create_agentcore_app
+from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.server import create_app
 
 
 async def test_agentcore_entrypoint_runs_fixture_with_fresh_request_state(tmp_path, monkeypatch):

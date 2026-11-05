@@ -5,11 +5,11 @@ from functools import partial
 
 from fastapi import FastAPI
 
-from exploration_agent.agentcore_mcp import runtime_url
+from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_clients.agentcore import runtime_url
+from exploration_agent.model import build_sakura_model_from_parameter_store
 from exploration_agent.observability import configure_observability
-from exploration_agent.parameter_store import build_sakura_model_from_parameter_store
-from exploration_agent.server import create_app
 
 
 def create_agentcore_app() -> FastAPI:

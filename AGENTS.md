@@ -51,7 +51,7 @@
 - クラウドリソース作成、費用が発生する操作、公開は実行前に相談する。既に許可された調査・ローカル実装・検証は進める。
 - ローカルサーバーのループバック限定を維持する。公開配備では認証・アクセス制限を別途設計する。
 - MCPのクラウド接続は東京のAgentCore Runtime ARNを指定し、IAM SigV4で署名する。認証情報は起動時に保持せず各HTTPリクエストで取得する。任意の外部MCP URLは許可しない。
-- リモートMCPは `agent/src/exploration_agent/docs_mcp.py` に固定したAWS Knowledge・Microsoft Learnの公開ドキュメント用のみ。URL・公開ツール・回数・結果の長さをアプリ側で固定し、結果は未検証データとして扱う。実環境を操作するMCPや接続先の追加は相談する。
+- リモートMCPは `agent/src/exploration_agent/mcp_clients/docs.py` に固定したAWS Knowledge・Microsoft Learnの公開ドキュメント用のみ。URL・公開ツール・回数・結果の長さをアプリ側で固定し、結果は未検証データとして扱う。実環境を操作するMCPや接続先の追加は相談する。
 
 ## 依存関係と仕様の確認
 

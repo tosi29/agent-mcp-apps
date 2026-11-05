@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from strands import Agent
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPClient
 from strands.types.tools import AgentTool
@@ -74,16 +71,6 @@ def build_docs_clients() -> list[MCPClient]:
         )
         for server in DOCS_SERVERS
     ]
-
-
-@asynccontextmanager
-async def managed_agent(**kwargs: Any) -> AsyncIterator[Agent]:
-    """Agent() connects its MCP clients synchronously, so keep that off the event loop."""
-    agent = await asyncio.to_thread(Agent, **kwargs)
-    try:
-        yield agent
-    finally:
-        await asyncio.to_thread(agent.cleanup)
 
 
 class DocsMCPHook(HookProvider):

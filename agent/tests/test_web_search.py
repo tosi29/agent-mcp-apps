@@ -11,10 +11,11 @@ from strands.models.openai import OpenAIModel
 from test_runtime import completion, response, tool_message
 from test_server import decode_sse, run_input
 
-from exploration_agent import runtime, web_search
-from exploration_agent.runtime import build_tools
-from exploration_agent.server import create_app
-from exploration_agent.web_search import (
+from exploration_agent import agent as agent_module
+from exploration_agent.agent import build_tools
+from exploration_agent.entrypoints.server import create_app
+from exploration_agent.tools import web as web_search
+from exploration_agent.tools.web import (
     MAX_CONTENT_CHARS,
     MAX_FETCHES_PER_RUN,
     MAX_PAGE_CHARS,
@@ -258,7 +259,7 @@ def test_fetch_failure_is_generic_and_does_not_leak(page, caplog):
 async def test_agui_run_fetches_a_found_page_and_reports_status(monkeypatch):
     page = {"results": [{"url": PAGE_URL, "raw_content": "ページ本文"}]}
     monkeypatch.setattr(
-        runtime, "build_web_tools", partial(build_web_tools, transport=tavily_site(page))
+        agent_module, "build_web_tools", partial(build_web_tools, transport=tavily_site(page))
     )
     requests = []
 

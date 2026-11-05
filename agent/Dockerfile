@@ -21,4 +21,4 @@ RUN uv sync --locked --no-dev --no-editable
 USER 10001:10001
 EXPOSE 8080
 
-CMD ["opentelemetry-instrument", "uvicorn", "exploration_agent.agentcore_server:create_agentcore_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["opentelemetry-instrument", "uvicorn", "exploration_agent.entrypoints.agentcore:create_agentcore_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]

@@ -13,10 +13,11 @@ from strands.models.openai import OpenAIModel
 from test_runtime import completion, response, tool_message
 from test_server import decode_sse, run_input
 
-from exploration_agent import agentcore_mcp
+from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.mcp_tools import MCP_TOOL_NAMES, build_mcp_clients
-from exploration_agent.server import agui_events, create_app
+from exploration_agent.mcp_clients import agentcore as agentcore_mcp
+from exploration_agent.mcp_clients.exploration import MCP_TOOL_NAMES, build_mcp_clients
 
 
 async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
@@ -94,7 +95,7 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
 
 @pytest.mark.parametrize("parallel", [False, True])
 async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monkeypatch, parallel):
-    from exploration_agent.mcp_apps import load_app_resources
+    from exploration_agent.mcp_clients.apps import load_app_resources
 
     requests = []
     loads = []
@@ -103,7 +104,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
         loads.append(True)
         return await load_app_resources(*args)
 
-    monkeypatch.setattr("exploration_agent.server.load_app_resources", load)
+    monkeypatch.setattr("exploration_agent.entrypoints.agui.load_app_resources", load)
 
     def handle(request):
         requests.append(json.loads(request.content))

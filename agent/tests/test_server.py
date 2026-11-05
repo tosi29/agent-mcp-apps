@@ -9,8 +9,9 @@ from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 from test_runtime import completion, response, tool_message
 
+from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.server import agui_events, create_app
 
 
 def run_input(**updates):

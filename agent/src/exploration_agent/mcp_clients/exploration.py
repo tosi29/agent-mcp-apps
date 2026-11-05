@@ -7,8 +7,8 @@ from urllib.parse import urlparse
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPClient
 
-from exploration_agent.agentcore_mcp import runtime_client
-from exploration_agent.mcp_apps import APP_TOOL
+from exploration_agent.mcp_clients.agentcore import runtime_client
+from exploration_agent.mcp_clients.apps import APP_TOOL
 
 MCP_TOOL_NAMES = (
     "describe_dataset",

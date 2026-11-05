@@ -5,8 +5,11 @@ from ag_ui.core import RunAgentInput
 from ag_ui_strands.agent import _extract_tool_result_data
 from test_server import run_input
 
-from exploration_agent import docs_mcp
-from exploration_agent.docs_mcp import (
+from exploration_agent.agent import managed_agent
+from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.mcp_clients import docs as docs_mcp
+from exploration_agent.mcp_clients.docs import (
     DOCS_SERVERS,
     MAX_DOCS_CALLS_PER_RUN,
     MAX_RESULT_CHARS,
@@ -16,11 +19,8 @@ from exploration_agent.docs_mcp import (
     DocsMCPHook,
     DocsServer,
     build_docs_clients,
-    managed_agent,
 )
-from exploration_agent.fixture_model import FixtureModel
-from exploration_agent.server import agui_events
-from exploration_agent.tools import echo_text
+from exploration_agent.tools.echo import echo_text
 
 
 def use_servers(monkeypatch, *servers):
@@ -95,7 +95,7 @@ async def test_agui_run_finishes_with_docs_clients_through_the_adapter(monkeypat
         clients.extend(build())
         return clients
 
-    monkeypatch.setattr("exploration_agent.server.build_docs_clients", record)
+    monkeypatch.setattr("exploration_agent.agent.build_docs_clients", record)
     events = [
         event.type.value
         async for event in agui_events(RunAgentInput.model_validate(run_input()), FixtureModel())

@@ -11,8 +11,8 @@ import pytest
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 
-from exploration_agent.cli import output
-from exploration_agent.runtime import SakuraSettings, stream_question
+from exploration_agent.entrypoints.cli import output, stream_question
+from exploration_agent.model import SakuraSettings
 
 
 def completion(message, finish_reason):
