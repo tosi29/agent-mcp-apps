@@ -33,8 +33,8 @@ async def stream_question(
 ) -> AsyncIterator[dict[str, Any]]:
     """One question per fresh agent. No durable sessions or raw SDK events on the wire."""
     configure_observability()
-    if not prompt.strip() or len(prompt) > 4000:
-        raise ValueError("prompt must contain 1–4000 characters")
+    if not prompt.strip():
+        raise ValueError("prompt must not be empty")
     request_id, started = uuid4().hex, time.monotonic()
     queue: asyncio.Queue[dict | None] = asyncio.Queue()
     sequence = 0

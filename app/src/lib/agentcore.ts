@@ -33,7 +33,6 @@ export async function runtimeStatus() {
 
 export async function fetchAgentCore(_url: string, init: RequestInit): Promise<Response> {
   if (typeof init.body !== "string") return Response.json({ error: "invalid body" }, { status: 400 });
-  if (Buffer.byteLength(init.body) > 128 * 1024) return Response.json({ error: "request too large" }, { status: 413 });
   const input = JSON.parse(init.body) as Run;
   const run = { threadId: input.threadId, runId: input.runId };
   const controller = new AbortController();
