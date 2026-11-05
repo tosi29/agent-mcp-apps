@@ -23,7 +23,7 @@ variable "agent_image_digest" {
 variable "sakura_api_key_parameter_name" {
   description = "事前作成したさくらAPIキーのSecureStringパラメータ名。値はTerraformで取得・管理しない。未指定ならfixture。"
   type        = string
-  default     = null
+  default     = "/agent-mcp-apps/sakura-api-key"
 
   validation {
     condition     = var.sakura_api_key_parameter_name == null ? true : can(regex("^/?[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", var.sakura_api_key_parameter_name))
