@@ -162,6 +162,10 @@ MCP初期化失敗時、採用SDKの後処理から `RuntimeWarning` が出る�
 既定のログレベルはINFOで、`LOG_LEVEL=DEBUG` などで変更できる。
 質問・回答・ツールの引数と結果・例外も記録対象になる。APIキーや認証ヘッダーは記録しない。
 
+ツールを使うrunでは、`opentelemetry.context` の `Failed to detach context`（`ValueError`）がERRORログに出る。
+`add_strands_fastapi_endpoint` がイベントごとに別タスクで処理するためで、回答には影響しない。
+MCPなしのrunでは、スパンの親子関係も1タスクで処理した場合と同じ。他のログも隠れるため、ログレベルでは抑制しない。
+
 コンテナは `opentelemetry-instrument` で起動する。単体のDocker起動ではconsole exporterを使い、
 端末のコンテナ出力へ出す。Terraform配備時は環境変数でADOTのAWS exporterへ切り替える。
 AgentCoreでは各RuntimeのCloudWatch Logsへログとスパン、CloudWatchへメトリクスを送る。
