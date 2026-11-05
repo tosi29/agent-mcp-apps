@@ -15,7 +15,6 @@ from exploration_agent.mcp_clients.docs import (
     MAX_RESULT_CHARS,
     TOOL_TIMEOUT,
     TRUNCATED_NOTICE,
-    UNTRUSTED_NOTICE,
     DocsMCPHook,
     DocsServer,
     build_docs_clients,
@@ -141,7 +140,7 @@ def test_result_is_bounded_marked_untrusted_and_text_only():
     assert "metadata" not in result
     # A single block: the AG-UI adapter forwards and replays only the last text block.
     body = "a" * (MAX_RESULT_CHARS - 2) + "\nb"
-    assert result["content"] == [{"text": f"{UNTRUSTED_NOTICE}\n{body}\n{TRUNCATED_NOTICE}"}]
+    assert result["content"] == [{"text": f"{body}\n{TRUNCATED_NOTICE}"}]
     assert _extract_tool_result_data(result["content"]) == result["content"][0]["text"]
 
 

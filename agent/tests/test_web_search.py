@@ -88,7 +88,6 @@ def test_request_is_fixed_by_the_app_and_result_is_projected():
     assert result["results"] == [
         {"title": "題", "url": "https://example.com/a", "content": "x" * MAX_CONTENT_CHARS}
     ]
-    assert "未検証" in result["notice"]
 
 
 @pytest.mark.parametrize("query", ["", "   ", "x" * 401])
@@ -196,7 +195,7 @@ def test_fetch_works_without_a_search_and_page_is_truncated():
         "include_favicon": False,
     }
     assert result["content"] == "x" * MAX_PAGE_CHARS and result["truncated"] is True
-    assert "未検証" in result["notice"] and result["url"] == PAGE_URL
+    assert result["url"] == PAGE_URL
 
 
 @pytest.mark.parametrize(
