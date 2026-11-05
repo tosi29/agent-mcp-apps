@@ -19,7 +19,6 @@ from exploration_agent.tools.web import (
     MAX_CONTENT_CHARS,
     MAX_PAGE_CHARS,
     MAX_RESULTS,
-    MAX_URL_CHARS,
     build_web_fetch_tool,
     build_web_search_tool,
     build_web_tools,
@@ -198,10 +197,7 @@ def test_fetch_works_without_a_search_and_page_is_truncated():
     assert result["url"] == PAGE_URL
 
 
-@pytest.mark.parametrize(
-    "url",
-    ["", "file:///etc/passwd", "javascript:alert(1)", "https://a.test/" + "x" * MAX_URL_CHARS],
-)
+@pytest.mark.parametrize("url", ["", "file:///etc/passwd", "javascript:alert(1)"])
 def test_fetch_rejects_non_web_urls_without_calling_tavily(url):
     def handle(request):
         raise AssertionError("Tavily must not be called")

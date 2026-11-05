@@ -17,8 +17,6 @@ TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 MAX_QUERY_CHARS = 400
 MAX_RESULTS = 5
-MAX_TITLE_CHARS = 200
-MAX_URL_CHARS = 500
 MAX_CONTENT_CHARS = 500
 MAX_PAGE_CHARS = 5000
 
@@ -45,22 +43,18 @@ def _api_key() -> str:
 
 
 def _is_web_url(url: Any) -> bool:
-    return (
-        isinstance(url, str)
-        and len(url) <= MAX_URL_CHARS
-        and url.startswith(("https://", "http://"))
-    )
+    return isinstance(url, str) and url.startswith(("https://", "http://"))
 
 
 def _project_result(item: Any) -> dict[str, str] | None:
-    """Keep only short text fields. Search results carry no raw page content."""
+    """Keep only the text fields. Search results carry no raw page content."""
     if not isinstance(item, dict):
         return None
     url = item.get("url")
     if not _is_web_url(url):
         return None
     return {
-        "title": str(item.get("title") or "")[:MAX_TITLE_CHARS],
+        "title": str(item.get("title") or ""),
         "url": url,
         "content": str(item.get("content") or "")[:MAX_CONTENT_CHARS],
     }
@@ -98,7 +92,7 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
             url: http(s)のURL。取引データの値や利用者の個人情報を含めない。
         """
         if not _is_web_url(url):
-            raise ValueError("urlは500文字以内のhttp(s)のURLにしてください")
+            raise ValueError("urlはhttp(s)のURLにしてください")
         try:
             items = _post_tavily(
                 TAVILY_EXTRACT_URL,
