@@ -15,13 +15,12 @@ from exploration_agent.mcp_clients.docs import (
     TOOL_TIMEOUT,
     TRUNCATED_NOTICE,
     DocsMCPHook,
-    DocsServer,
     build_docs_clients,
 )
 from exploration_agent.tools.echo import echo_text
 
 
-def use_servers(monkeypatch, *servers):
+def use_servers(monkeypatch, servers):
     monkeypatch.setenv("DOCS_MCP_ENABLED", "true")
     monkeypatch.setattr(docs_mcp, "DOCS_SERVERS", servers)
 
@@ -35,7 +34,7 @@ def before(name, tool=None):
 
 
 def test_endpoints_and_tools_are_fixed():
-    assert {server.url for server in DOCS_SERVERS} == {
+    assert set(DOCS_SERVERS) == {
         "https://knowledge-mcp.global.api.aws",
         "https://learn.microsoft.com/api/mcp",
     }
@@ -53,7 +52,7 @@ def test_disabled_without_explicit_true(monkeypatch, value):
 
 
 async def test_only_allowed_tools_load_and_connection_closes_after_run(monkeypatch, mcp_url):
-    use_servers(monkeypatch, DocsServer("local", mcp_url, ("describe_dataset",)))
+    use_servers(monkeypatch, {mcp_url: ("describe_dataset",)})
     clients = build_docs_clients()
     async with managed_agent(**agent_args(clients)) as agent:
         assert set(agent.tool_registry.registry) == {"echo_text", "describe_dataset"}
@@ -64,15 +63,17 @@ async def test_only_allowed_tools_load_and_connection_closes_after_run(monkeypat
 async def test_unreachable_server_is_skipped(monkeypatch, mcp_url):
     use_servers(
         monkeypatch,
-        DocsServer("down", "http://127.0.0.1:9/mcp", ("search_transactions",)),
-        DocsServer("local", mcp_url, ("describe_dataset",)),
+        {
+            "http://127.0.0.1:9/mcp": ("search_transactions",),
+            mcp_url: ("describe_dataset",),
+        },
     )
     async with managed_agent(**agent_args(build_docs_clients())) as agent:
         assert set(agent.tool_registry.registry) == {"echo_text", "describe_dataset"}
 
 
 async def test_failed_tool_listing_is_skipped_and_closed(monkeypatch, mcp_url):
-    use_servers(monkeypatch, DocsServer("local", mcp_url, ("describe_dataset",)))
+    use_servers(monkeypatch, {mcp_url: ("describe_dataset",)})
     client = build_docs_clients()[0]
 
     def fail(*args, **kwargs):
@@ -85,7 +86,7 @@ async def test_failed_tool_listing_is_skipped_and_closed(monkeypatch, mcp_url):
 
 
 async def test_agui_run_finishes_with_docs_clients_through_the_adapter(monkeypatch, mcp_url):
-    use_servers(monkeypatch, DocsServer("local", mcp_url, ("describe_dataset",)))
+    use_servers(monkeypatch, {mcp_url: ("describe_dataset",)})
     clients = []
     build = docs_mcp.build_docs_clients
 

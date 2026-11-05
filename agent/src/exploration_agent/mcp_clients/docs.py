@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -16,31 +15,20 @@ from strands.types.tools import AgentTool
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class DocsServer:
-    name: str
-    url: str
-    tools: tuple[str, ...]
-
-
-DOCS_SERVERS = (
-    DocsServer(
-        "aws",
-        "https://knowledge-mcp.global.api.aws",
-        (
-            "aws___search_documentation",
-            "aws___read_documentation",
-            "aws___list_regions",
-            "aws___get_regional_availability",
-        ),
+DOCS_SERVERS = {
+    "https://knowledge-mcp.global.api.aws": (
+        "aws___search_documentation",
+        "aws___read_documentation",
+        "aws___list_regions",
+        "aws___get_regional_availability",
     ),
-    DocsServer(
-        "azure",
-        "https://learn.microsoft.com/api/mcp",
-        ("microsoft_docs_search", "microsoft_docs_fetch", "microsoft_code_sample_search"),
+    "https://learn.microsoft.com/api/mcp": (
+        "microsoft_docs_search",
+        "microsoft_docs_fetch",
+        "microsoft_code_sample_search",
     ),
-)
-DOCS_TOOL_NAMES = frozenset(name for server in DOCS_SERVERS for name in server.tools)
+}
+DOCS_TOOL_NAMES = frozenset(name for tools in DOCS_SERVERS.values() for name in tools)
 MAX_RESULT_CHARS = 8000
 TOOL_TIMEOUT = timedelta(seconds=20)
 TRUNCATED_NOTICE = "（上限に達したため以降を省略しました）"
@@ -62,12 +50,12 @@ def build_docs_clients() -> list[MCPClient]:
         return []
     return [
         OptionalMCPClient(
-            url=server.url,
+            url=url,
             startup_timeout=5,
-            tool_filters={"allowed": list(server.tools)},
+            tool_filters={"allowed": list(tools)},
             continue_on_error=True,
         )
-        for server in DOCS_SERVERS
+        for url, tools in DOCS_SERVERS.items()
     ]
 
 
