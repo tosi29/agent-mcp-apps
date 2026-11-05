@@ -10,11 +10,9 @@
 - `mcp/`：探索4ツール・MCP AppsのダッシュボードとDuckDB・Parquet・結果保存を持つMCPサーバー。Python・uvで管理し、`mcp/ui/` のHTMLビルドはnpmで管理する。
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
 - Terraformには有効・無効を切り替える条件分岐を新たに足さない。新しいリソースは常に作成し、値は変数の既定値で与える。`terraform test` のテストは書かない。
-- Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使い、HTTPエンドポイントは標準の `add_strands_fastapi_endpoint` に任せる。
-- MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルと、キー設定時のみ登録するTavilyのweb_search・web_fetch。データ探索のツールをPython側へ増やさない。
-- MCP Appsは右ペインのsandboxで描画する。ADKは実装範囲に含めない。クラウドのsandbox配備や構成の重要な変更は相談する。
-- クラウドのsandboxは専用API Gatewayの `GET /poc/sandbox` を既存Next.js Lambdaへ接続する。同じ送信元IP制限と別オリジンを維持し、URLはTerraformから実行時環境変数へ渡す。HTML・中継処理はローカルproxyと共用し、起動・ビルドスクリプトを増やさない。
+- MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。データ探索のツールをPython側へ増やさない。
+- クラウドのsandbox配備や構成の重要な変更は相談する。sandboxは同じ送信元IP制限と別オリジンを維持し、HTML・中継処理はローカルproxyと共用して、起動・ビルドスクリプトを増やさない。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
 
 ## データ探索の境界
@@ -24,7 +22,6 @@
 - 検索・集計はDuckDBのRelational APIとExpression APIで構築する。条件値は `lit()`、列は `col()` で表し、動的な列は許可リストから選ぶ。ユーザー入力をSQL文字列や `sql_expr()` に渡さない。
 - 検索処理はエージェントSDKや表示処理から分離する。取得行数・実行時間・メモリ等の制約を維持する。
 - クエリビルダーを使っても、アクセス制御や検索パターンの扱いが自動で解決するとはみなさない。
-- 複数キーワード、キーワードごとの検索モード、キーワード間のAND/OR条件は検討案であり、現在は未実装。採用・実装する際は方針を確認し、この記述も更新する。
 
 ## モデルと画面のデータ経路
 
@@ -40,18 +37,16 @@
 - 推論APIキーはローカルでは `agent/.env`、AgentCoreでは事前作成したParameter StoreのSecureStringを使う。Next.js側やブラウザへコピーしない。
 - Parameter Storeの値をTerraformで取得・管理しない。AgentCore V2の起動時スナップショットへ含めないよう、キーは初回利用時に取得してメモリに保持する。プロセスの環境変数やファイルへコピーしない。キーの変更は再起動で反映する。
 - TavilyのAPIキーも同じ扱いで、ローカルは `agent/.env`、AgentCoreはSecureStringを使う。
-- `web_search` でモデルに渡す引数は `query` のみとし、取得件数・抜粋長の上限をアプリ側で固定する。呼び出し回数は制限しない。検索クエリは外部へ送られ、検索結果は未検証データとして扱う。
-- `web_fetch` でモデルに渡す引数は `url` のみとする。取得先のサイトはPoCとして制限しないが、取得はTavily Extract経由とし、エージェントから直接通信しない。本文の長さの上限はアプリ側で固定し、呼び出し回数は制限しない。本文も未検証データとして扱う。実データの導入前にURLの制限を見直す。
+- Web検索とリモートMCPの仕様は [agent/README.md](agent/README.md) を参照し、変更する場合は実装と整合させる。外部から取得した内容は未検証データとして扱う。
 - `.env`、実データ、実行ログ、Terraform state等をコミットしない。キーや認証ヘッダーをログ・ツール出力・資料へ表示しない。
 - エージェントとMCPのログ・トレース・メトリクスは有効にする。通常のローカル起動ではstderr、AgentCoreではADOT経由でCloudWatchへ出す。質問・回答・ツール引数・結果も記録対象とするが、キーや認証ヘッダーは記録しない。
-- フロントの利用状況テレメトリ無効化は維持し、起動・ビルドにはnpmスクリプトを使う。`DO_NOT_TRACK` を全通信の遮断機能とはみなさない。
+- フロントの利用状況テレメトリ無効化は維持し、起動・ビルドにはnpmスクリプトを使う。
 - 通常の検証は外部API不要のテストとfixtureモードを使う。fixtureの固定応答をモデルの推論結果として扱わない。
 - 実API試験は事前に合意したモデル・利用プラン・呼び出し回数の範囲で行う。追加試験や有料APIへの切り替えは相談する。
 - 推論時は質問・会話履歴・ツール結果の要約が外部モデルAPIへ送られることを踏まえ、実データの導入前に送信範囲を確認する。
 - クラウドリソース作成、費用が発生する操作、公開は実行前に相談する。既に許可された調査・ローカル実装・検証は進める。
 - ローカルサーバーのループバック限定を維持する。公開配備では認証・アクセス制限を別途設計する。
-- MCPのクラウド接続は東京のAgentCore Runtime ARNを指定し、IAM SigV4で署名する。認証情報は起動時に保持せず各HTTPリクエストで取得する。任意の外部MCP URLは許可しない。
-- リモートMCPは `agent/src/exploration_agent/mcp_clients/docs.py` に固定したAWS Knowledge・Microsoft Learnの公開ドキュメント用のみ。URL・公開ツール・結果の長さをアプリ側で固定し、呼び出し回数は制限しない。結果は未検証データとして扱う。実環境を操作するMCPや接続先の追加は相談する。
+- 任意の外部MCP URLは許可しない。実環境を操作するMCPや接続先の追加は相談する。
 
 ## 依存関係と仕様の確認
 
