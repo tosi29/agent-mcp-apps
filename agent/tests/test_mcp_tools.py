@@ -248,6 +248,51 @@ async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
     assert sessions[0] != sessions[1]
 
 
+async def test_app_resource_session_is_signed_and_advertises_apps(mcp_url, monkeypatch):
+    from exploration_agent.mcp_clients.apps import APP_MIME, APP_URI, load_app_resources
+
+    bodies = []
+    methods = []
+    frozen = ReadOnlyCredentials("test-key", "test-secret", "test-session-token")
+
+    async def forward(request):
+        assert request.headers["Authorization"].startswith("AWS4-HMAC-SHA256 ")
+        methods.append(request.method)
+        bodies.append(request.content.decode())
+        async with httpx.AsyncClient() as upstream:
+            response = await upstream.post(
+                mcp_url,
+                content=request.content,
+                headers={k: v for k, v in request.headers.items() if k != "host"},
+            )
+        return httpx2.Response(
+            response.status_code,
+            headers={**response.headers, "Mcp-Session-Id": "returned-session"},
+            content=response.content,
+        )
+
+    original_client = httpx2.AsyncClient
+    monkeypatch.setattr(
+        agentcore_mcp.boto3,
+        "Session",
+        lambda: SimpleNamespace(
+            get_credentials=lambda: SimpleNamespace(get_frozen_credentials=lambda: frozen)
+        ),
+    )
+    monkeypatch.setattr(
+        httpx2,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=httpx2.MockTransport(forward), **kwargs),
+    )
+    app = await load_app_resources(None, RUNTIME_ARN)
+    assert app["resourceUri"] == APP_URI
+    assert app["mimeType"] == APP_MIME
+    assert app["html"]
+    assert any("io.modelcontextprotocol/ui" in body for body in bodies)
+    # AgentCore answers the session DELETE with 404, so it must not be sent.
+    assert "DELETE" not in methods
+
+
 @pytest.mark.parametrize(
     "arn",
     [

@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from strands.hooks import AfterToolCallEvent, HookProvider, HookRegistry
 from strands.tools.mcp import MCPClient
 
-from exploration_agent.mcp_clients.agentcore import runtime_client
+from exploration_agent.mcp_clients.agentcore import RuntimeAuth, runtime_url
 from exploration_agent.mcp_clients.apps import APP_TOOL
 
 MCP_TOOL_NAMES = (
@@ -23,7 +23,14 @@ RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values
 def build_mcp_clients(url: str | None, runtime_arn: str | None) -> list[MCPClient]:
     """Build the client for Agent(tools=...), which connects and closes it."""
     if runtime_arn is not None:
-        return [runtime_client(runtime_arn, allowed_tools=list(MCP_TOOL_NAMES))]
+        return [
+            MCPClient(
+                url=runtime_url(runtime_arn),
+                auth_provider=RuntimeAuth(),
+                startup_timeout=60,
+                tool_filters={"allowed": list(MCP_TOOL_NAMES)},
+            )
+        ]
     if url is None:
         return []
     if urlparse(url).hostname not in {"127.0.0.1", "localhost"}:

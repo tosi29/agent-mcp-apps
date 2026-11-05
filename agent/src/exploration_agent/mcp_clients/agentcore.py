@@ -1,8 +1,7 @@
-"""Request-scoped, SigV4-signed MCP transport for one Tokyo AgentCore runtime."""
+"""The URL and SigV4 request signing for one Tokyo AgentCore runtime."""
 
 import asyncio
 import re
-from contextlib import asynccontextmanager
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -10,8 +9,6 @@ import boto3
 import httpx2
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
-from mcp.client.streamable_http import streamable_http_client
-from strands.tools.mcp import MCPClient
 
 REGION = "ap-northeast-1"
 RUNTIME_ARN = re.compile(
@@ -58,27 +55,3 @@ class RuntimeAuth(httpx2.Auth):
         response = yield request
         if session_id := response.headers.get("Mcp-Session-Id"):
             self.session_id = session_id
-
-
-@asynccontextmanager
-async def runtime_transport(arn: str):
-    url = runtime_url(arn)
-    async with httpx2.AsyncClient(
-        auth=RuntimeAuth(),
-        timeout=httpx2.Timeout(60, connect=10),
-        follow_redirects=False,
-    ) as client:
-        async with streamable_http_client(
-            url, http_client=client, terminate_on_close=False
-        ) as streams:
-            yield streams
-
-
-def runtime_client(arn: str, *, allowed_tools: list[str]) -> MCPClient:
-    # Validate before creating a worker or resolving credentials.
-    runtime_url(arn)
-    return MCPClient(
-        lambda: runtime_transport(arn),
-        startup_timeout=60,
-        tool_filters={"allowed": allowed_tools},
-    )
