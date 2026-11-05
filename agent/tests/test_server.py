@@ -10,7 +10,7 @@ import pytest
 from ag_ui.core import RunAgentInput
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
-from test_runtime import completion, response, tool_message
+from test_agui_run import completion, response, tool_message
 
 from exploration_agent.entrypoints.agui import agui_events
 from exploration_agent.entrypoints.server import create_app

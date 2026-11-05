@@ -8,7 +8,7 @@ import httpx2
 import pytest
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
-from test_runtime import completion, response, tool_message
+from test_agui_run import completion, response, tool_message
 from test_server import decode_sse, run_input
 
 from exploration_agent import agent as agent_module

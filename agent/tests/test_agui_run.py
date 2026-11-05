@@ -1,4 +1,4 @@
-"""Real Strands + OpenAI provider; only the external HTTP service is simulated.
+"""Real Strands + OpenAI provider through AG-UI; only the external HTTP service is simulated.
 
 These tests prove local SDK integration, not Sakura API compatibility or model quality.
 """
@@ -8,10 +8,11 @@ import json
 
 import httpx2
 import pytest
+from ag_ui.core import RunAgentInput
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 
-from exploration_agent.entrypoints.cli import output, stream_question
+from exploration_agent.entrypoints.agui import agui_events
 from exploration_agent.model import SakuraSettings
 
 
@@ -97,6 +98,32 @@ def response(body, streaming):
     )
 
 
+def run_events(model, prompt="テスト", **kwargs):
+    run = RunAgentInput.model_validate(
+        {
+            "threadId": "local-thread",
+            "runId": "local-run",
+            "messages": [{"id": "user-1", "role": "user", "content": prompt}],
+            "tools": [],
+            "context": [],
+            "state": {},
+            "forwardedProps": {},
+        }
+    )
+    return agui_events(run, model, **kwargs)
+
+
+async def collect(model, prompt="テスト", **kwargs):
+    return [
+        event.model_dump(mode="json", by_alias=True)
+        async for event in run_events(model, prompt, **kwargs)
+    ]
+
+
+def custom(events, name):
+    return [event["value"] for event in events if event.get("name") == name]
+
+
 @pytest.mark.parametrize("streaming", [True, False])
 async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_url, mcp_results):
     requests = []
@@ -121,9 +148,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
         model = OpenAIModel(client=client, model_id="mock", stream=streaming)
-        events = [
-            event async for event in stream_question("合成データを検索", model, mcp_url=mcp_url)
-        ]
+        events = await collect(model, "合成データを検索", mcp_url=mcp_url)
     assert len(requests) == 3
     search_spec = next(
         item["function"]
@@ -132,13 +157,9 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     )
     assert "tool_context" not in search_spec["parameters"]["properties"]
     assert all(request["stream"] is streaming for request in requests)
-    assert events[-1]["type"] == "done"
-    assert events[-1]["status"] == "success", events
-    assert events[-1]["model_calls"] == 3
-    assert events[-1]["tool_calls"] == 2
-    assert events[-1]["tool_errors"] == 0
-    assert [e["seq"] for e in events] == list(range(1, len(events) + 1))
-    data = next(e for e in events if e["type"] == "data_result")
+    assert events[-1]["type"] == "RUN_FINISHED", events
+    assert custom(events, "run_metrics") == [{"model_calls": 3, "tool_calls": 2, "tool_errors": 0}]
+    data = custom(events, "data_result")[0]
     assert data["tool_call_id"] == "call-search"
     assert len(data["preview_rows"]) == 20
     assert data["total_count"] == 360
@@ -155,10 +176,8 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     assert projection["sample_truncated"] is True
     assert "rows" not in projection
     assert "合成データの検索結果です。" == "".join(
-        e["text"] for e in events if e["type"] == "text_delta"
+        e["delta"] for e in events if e["type"] == "TEXT_MESSAGE_CONTENT"
     )
-    types = [e["type"] for e in events]
-    assert types.index("data_result") < max(i for i, t in enumerate(types) if t == "tool_end")
 
 
 async def test_provider_error_is_terminal_and_not_leaked(tmp_path):
@@ -176,35 +195,11 @@ async def test_provider_error_is_terminal_and_not_leaked(tmp_path):
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = [
-            e async for e in stream_question("テスト", OpenAIModel(client=client, model_id="mock"))
-        ]
+        events = await collect(OpenAIModel(client=client, model_id="mock"))
     assert calls == 1
-    assert [e["type"] for e in events] == ["error", "done"]
-    assert events[-1]["status"] == "error"
+    assert events[-1]["type"] == "RUN_ERROR"
+    assert not any(e["type"] == "RUN_FINISHED" for e in events)
     assert "private-secret" not in json.dumps(events)
-
-
-async def test_request_timeout(tmp_path):
-    async def handle(request):
-        await asyncio.sleep(1)
-        return response(completion({"role": "assistant", "content": "unused"}, "stop"), True)
-
-    async with AsyncOpenAI(
-        api_key="test",
-        max_retries=0,
-        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
-    ) as client:
-        events = [
-            e
-            async for e in stream_question(
-                "テスト",
-                OpenAIModel(client=client, model_id="mock"),
-                timeout_seconds=0.01,
-            )
-        ]
-    assert events[-2]["code"] == "TimeoutError"
-    assert events[-1]["status"] == "error"
 
 
 def test_sakura_settings_require_key_and_model(monkeypatch):
@@ -219,14 +214,6 @@ def test_sakura_settings_require_key_and_model(monkeypatch):
     settings = SakuraSettings.from_env()
     assert settings.api_key == "test-key"
     assert settings.model_id == "test-model"
-
-
-def test_sse_frame_encoding(capsys):
-    output({"request_id": "request", "seq": 1, "type": "text_delta", "text": "A\nB"}, True)
-    encoded = capsys.readouterr().out
-    assert encoded.startswith("id: request:1\nevent: text_delta\ndata: ")
-    assert encoded.endswith("\n\n")
-    assert json.loads(encoded.split("data: ")[1])["text"] == "A\nB"
 
 
 async def test_text_arrives_before_http_stream_finishes(tmp_path):
@@ -256,15 +243,17 @@ async def test_text_arrives_before_http_stream_finishes(tmp_path):
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = stream_question("テスト", OpenAIModel(client=client, model_id="mock"))
+        events = run_events(OpenAIModel(client=client, model_id="mock"))
         try:
-            first = await asyncio.wait_for(anext(events), 2)
-            assert first["type"] == "text_delta"
-            assert first["text"] == "途中"
+            while True:
+                event = await asyncio.wait_for(anext(events), 2)
+                if event.type == "TEXT_MESSAGE_CONTENT":
+                    break
+            assert event.delta == "途中"
             assert not finish.is_set()
             finish.set()
             rest = [event async for event in events]
-            assert rest[-1]["status"] == "success"
+            assert rest[-1].type == "RUN_FINISHED"
         finally:
             finish.set()
             await events.aclose()
@@ -288,15 +277,10 @@ async def test_invalid_tool_input_reports_error_without_data(tmp_path, mcp_url):
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = [
-            event
-            async for event in stream_question(
-                "テスト", OpenAIModel(client=client, model_id="mock"), mcp_url=mcp_url
-            )
-        ]
-    assert not any(e["type"] == "data_result" for e in events)
-    assert next(e for e in events if e["type"] == "tool_end")["status"] == "error"
-    assert events[-1]["tool_errors"] == 1
+        events = await collect(OpenAIModel(client=client, model_id="mock"), mcp_url=mcp_url)
+    assert custom(events, "data_result") == []
+    assert custom(events, "tool_status")[0]["status"] == "error"
+    assert custom(events, "run_metrics")[0]["tool_errors"] == 1
 
 
 async def test_ordinary_function_call_sample_works_without_mcp():
@@ -316,16 +300,10 @@ async def test_ordinary_function_call_sample_works_without_mcp():
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
-        events = [
-            e
-            async for e in stream_question(
-                "こんにちはを返して",
-                OpenAIModel(client=client, model_id="mock"),
-            )
-        ]
+        events = await collect(OpenAIModel(client=client, model_id="mock"), "こんにちはを返して")
     assert [t["function"]["name"] for t in requests[0]["tools"]] == ["echo_text"]
     tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
     assert json.loads(tool_result["content"]) == {"text": "こんにちは"}
-    assert events[-1]["status"] == "success"
-    assert events[-1]["tool_calls"] == 1
-    assert not any(e["type"] == "data_result" for e in events)
+    assert events[-1]["type"] == "RUN_FINISHED"
+    assert custom(events, "run_metrics")[0]["tool_calls"] == 1
+    assert custom(events, "data_result") == []

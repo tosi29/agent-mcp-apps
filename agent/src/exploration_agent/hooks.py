@@ -33,12 +33,6 @@ class RequestHooks(HookProvider):
     def before_tool(self, event: BeforeToolCallEvent) -> None:
         logger.info("tool_start %s", event.tool_use)
         self.tool_calls += 1
-        self.emit(
-            "tool_start",
-            tool_call_id=event.tool_use["toolUseId"],
-            name=event.tool_use["name"],
-            arguments=event.tool_use["input"],
-        )
 
     def after_tool(self, event: AfterToolCallEvent) -> None:
         logger.info("tool_end %s", event.result)

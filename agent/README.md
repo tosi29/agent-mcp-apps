@@ -55,14 +55,12 @@ chmod 600 .env
 
 ```sh
 uv run --locked --env-file .env explore-server --mcp-url http://127.0.0.1:8001/mcp
-uv run --locked --env-file .env explore ask '新宿区を年別に集計して' --mcp-url http://127.0.0.1:8001/mcp
 ```
 
-通常のPythonツールだけを試す場合は、MCP接続先を省略して `こんにちはをecho_textで返して` と質問する。
+通常のPythonツールだけを試す場合は、MCP接続先を省略して起動し、画面から `こんにちはをecho_textで返して` と質問する。
 実際の質問送信は、質問・会話履歴・ツール結果の要約をさくらの `/v1/chat/completions` へ送る。
 モデル呼び出しの回数は制限せず、各回 `max_tokens=2048`、HTTPタイムアウト60秒、1質問全体で300秒。
 Strands・OpenAIクライアントの自動再試行と、有料モデルへの自動フォールバックは無効。
-CLIの `--no-stream` はモデルの非ストリーム動作、`--sse` は標準出力の形式を切り替える。
 
 ## ディレクトリ構成
 
@@ -74,7 +72,7 @@ src/exploration_agent/
 ├── fixture_model.py     # 外部API不要の固定応答
 ├── secure_parameter.py  # Parameter Storeの遅延読み込み
 ├── observability.py     # ログ・トレース・メトリクス
-├── entrypoints/         # 起動の入口：server（AG-UI）、agui（イベント変換）、agentcore、cli
+├── entrypoints/         # 起動の入口：server（AG-UI）、agui（イベント変換）、agentcore
 ├── tools/               # 通常のPythonツール：echo、web（web_search・web_fetch）
 └── mcp_clients/         # MCPへの接続：exploration、apps、docs、agentcore（SigV4署名）
 ```
@@ -160,7 +158,7 @@ MCP初期化失敗時、採用SDKの後処理から `RuntimeWarning` が出る�
 ## ログとテレメトリ
 
 通常の `uv run` 起動では、Pythonログ・OTelトレース・メトリクスをstderrへ出す。
-外部のOTel送信先は設定しない。CLIのJSON/SSEはstdoutへ出す。
+外部のOTel送信先は設定しない。
 既定のログレベルはINFOで、`LOG_LEVEL=DEBUG` などで変更できる。
 質問・回答・ツールの引数と結果・例外も記録対象になる。APIキーや認証ヘッダーは記録しない。
 

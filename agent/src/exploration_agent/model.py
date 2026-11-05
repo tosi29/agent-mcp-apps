@@ -15,15 +15,14 @@ from exploration_agent.secure_parameter import read_secure_parameter
 class SakuraSettings:
     api_key: str
     model_id: str
-    stream: bool = True
 
     @classmethod
-    def from_env(cls, stream: bool = True, *, api_key: str | None = None) -> SakuraSettings:
+    def from_env(cls, *, api_key: str | None = None) -> SakuraSettings:
         key = (os.environ.get("SAKURA_API_KEY", "") if api_key is None else api_key).strip()
         model = os.environ.get("SAKURA_MODEL_ID", "").strip()
         if not key or not model:
             raise ValueError("SAKURA_API_KEYとSAKURA_MODEL_IDを設定してください")
-        return cls(key, model, stream)
+        return cls(key, model)
 
     def build_model(self) -> OpenAIModel:
         return OpenAIModel(
@@ -34,7 +33,6 @@ class SakuraSettings:
                 "timeout": 60.0,
             },
             model_id=self.model_id,
-            stream=self.stream,
             params={"max_tokens": 2048},
         )
 

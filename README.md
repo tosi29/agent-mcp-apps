@@ -17,7 +17,7 @@ Browser / Next.js + CopilotKit
 | ディレクトリ | 役割 |
 | --- | --- |
 | `app/` | Next.jsのチャット画面、CopilotKit Runtime、AG-UI接続。npmで管理 |
-| `agent/` | Strands・CLI・AG-UIサーバー、Pythonツールのechoサンプル。uvで管理 |
+| `agent/` | Strands・AG-UIサーバー、Pythonツールのechoサンプル。uvで管理 |
 | `mcp/` | スキーマ確認・検索・集計・数値比較のMCPとDuckDB。uvで管理 |
 | `terraform/` | AgentCore Runtime V2・ECR・IAMと、API Gateway＋Web Adapter＋Next.jsのLambda配備 |
 
@@ -110,5 +110,5 @@ URLはTerraformがLambdaへ自動設定する。配備は [TerraformのREADME](t
 結果はMCP側に最大200行を一時保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)
-- [agent：接続設定、CLI、ツール、実行制約、自動テスト](agent/README.md)
+- [agent：接続設定、ツール、実行制約、自動テスト](agent/README.md)
 - [terraform：AgentCoreへの配備](terraform/README.md)

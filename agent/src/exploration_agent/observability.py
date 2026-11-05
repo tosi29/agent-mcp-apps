@@ -56,7 +56,7 @@ def configure_observability() -> None:
 
 
 def log_callback(**event) -> None:
-    """Emit Strands callback output on stderr, keeping CLI JSON/SSE valid on stdout."""
+    """Emit Strands callback output through logging."""
     if isinstance(event.get("data"), str):
         logger.info("model_output %s", event["data"])
     if event.get("current_tool_use"):
