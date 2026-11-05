@@ -77,8 +77,6 @@ class DocsMCPHook(HookProvider):
         if event.tool_use["name"] not in DOCS_TOOL_NAMES:
             return
         result = event.result
-        result.pop("structuredContent", None)
-        result.pop("metadata", None)
         body = "\n".join(
             block["text"]
             for block in result.get("content", [])

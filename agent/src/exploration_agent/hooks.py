@@ -8,7 +8,7 @@ from typing import Any
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 
 from exploration_agent.mcp_clients.apps import APP_TOOL
-from exploration_agent.mcp_clients.exploration import MCP_TOOL_NAMES, RESULT_TOOLS
+from exploration_agent.mcp_clients.exploration import RESULT_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +32,17 @@ class ToolResultHook(HookProvider):
     async def after_tool(self, event: AfterToolCallEvent) -> None:
         name = event.tool_use["name"]
         tool_call_id = event.tool_use["toolUseId"]
-        status = event.result.get("status", "error")
+        status = event.result["status"]
         # Raw exceptions may contain paths, provider responses, or secrets. Do not forward them.
         self.statuses[tool_call_id] = {"tool_call_id": tool_call_id, "name": name, "status": status}
-        if name in MCP_TOOL_NAMES:
-            structured = event.result.pop("structuredContent", None)
-            metadata = event.result.pop("metadata", None) or {}
-            if name in RESULT_TOOLS and status == "success":
-                preview = await self._preview(event, structured, metadata)
-                self.previews[tool_call_id] = {**preview, "tool_call_id": tool_call_id}
+        structured = event.result.pop("structuredContent", None)
+        metadata = event.result.pop("metadata", None)
+        if name in RESULT_TOOLS and status == "success":
+            preview = await self._preview(event, structured, metadata)
+            self.previews[tool_call_id] = {**preview, "tool_call_id": tool_call_id}
         logger.info("tool_end %s", event.result)
 
-    async def _preview(self, event: AfterToolCallEvent, structured: Any, metadata: dict) -> dict:
+    async def _preview(self, event: AfterToolCallEvent, structured: Any, metadata: Any) -> dict:
         if event.tool_use["name"] != APP_TOOL:
             return structured
         preview = metadata["preview"]

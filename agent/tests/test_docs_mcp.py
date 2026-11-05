@@ -8,6 +8,7 @@ from test_server import run_input
 from exploration_agent.agent import managed_agent
 from exploration_agent.agui import agui_events
 from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.hooks import ToolResultHook
 from exploration_agent.mcp_clients import docs as docs_mcp
 from exploration_agent.mcp_clients.docs import (
     DOCS_SERVERS,
@@ -130,12 +131,26 @@ def test_result_is_bounded_and_text_only():
     }
     event = SimpleNamespace(tool_use={"name": "microsoft_docs_fetch"}, result=result)
     DocsMCPHook().after_tool(event)
-    assert "structuredContent" not in result
-    assert "metadata" not in result
     # A single block: the AG-UI adapter forwards and replays only the last text block.
     body = "a" * (MAX_RESULT_CHARS - 2) + "\nb"
     assert result["content"] == [{"text": f"{body}\n{TRUNCATED_NOTICE}"}]
     assert _extract_tool_result_data(result["content"]) == result["content"][0]["text"]
+
+
+async def test_ui_fields_are_stripped_from_docs_results():
+    result = {
+        "status": "success",
+        "toolUseId": "1",
+        "content": [{"text": "x"}],
+        "structuredContent": {"raw": "x"},
+        "metadata": {"raw": "x"},
+    }
+    event = SimpleNamespace(
+        tool_use={"name": "microsoft_docs_fetch", "toolUseId": "1"}, result=result
+    )
+    await ToolResultHook(app_loader=None).after_tool(event)
+    assert "structuredContent" not in result
+    assert "metadata" not in result
 
 
 def test_other_tool_results_are_untouched():

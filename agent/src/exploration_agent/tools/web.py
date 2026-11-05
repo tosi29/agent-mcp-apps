@@ -36,21 +36,18 @@ def web_search_enabled() -> bool:
 def _api_key() -> str:
     # Read on first use so the key stays out of agent state and startup snapshots.
     name = _parameter_name()
-    key = (read_secure_parameter(name) if name else _local_key()).strip()
-    if not key:
-        raise ValueError("Tavily APIキーが空です")
-    return key
+    return read_secure_parameter(name) if name else _local_key()
 
 
-def _is_web_url(url: Any) -> bool:
-    return isinstance(url, str) and url.startswith(("https://", "http://"))
+def _is_web_url(url: str) -> bool:
+    return url.startswith(("https://", "http://"))
 
 
 def _project_result(item: Any) -> dict[str, str] | None:
     """Keep only the text fields. Search results carry no raw page content."""
     if not isinstance(item, dict):
         return None
-    url = item.get("url")
+    url = str(item.get("url") or "")
     if not _is_web_url(url):
         return None
     return {
@@ -107,7 +104,7 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
             ).get("results", [])
             # HTTP 200 can still mean failure: the URL is then listed in failed_results instead.
             content = items[0]["raw_content"]
-            if not isinstance(content, str) or not content.strip():
+            if not content.strip():
                 raise ValueError("empty page")
         except Exception as error:
             logger.warning("web_fetch failed: %s", type(error).__name__)
@@ -129,7 +126,7 @@ def build_web_search_tool(*, transport: httpx2.BaseTransport | None = None):
         Args:
             query: 400文字以内の検索語。取引データの値や利用者の個人情報を含めない。
         """
-        if not isinstance(query, str) or not query.strip() or len(query) > MAX_QUERY_CHARS:
+        if not query.strip() or len(query) > MAX_QUERY_CHARS:
             raise ValueError("queryは1〜400文字の文字列にしてください")
         try:
             items = _post_tavily(

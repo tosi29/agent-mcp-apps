@@ -144,14 +144,11 @@ def test_parameter_store_key_is_read_on_use_without_changing_environment(monkeyp
     assert web_search.os.environ["TAVILY_API_KEY"] == "local-must-not-be-used"
 
 
-@pytest.mark.parametrize("value", ["", None])
-def test_unavailable_parameter_fails_the_tool_only(monkeypatch, value):
+def test_unavailable_parameter_fails_the_tool_only(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY_PARAMETER_NAME", "/test/tavily")
 
     def read(name):
-        if value is None:
-            raise RuntimeError("private-detail")
-        return value
+        raise RuntimeError("private-detail")
 
     monkeypatch.setattr(web_search, "read_secure_parameter", read)
     with pytest.raises(RuntimeError, match="^Web検索に失敗しました$"):
@@ -247,7 +244,7 @@ async def test_agui_run_fetches_a_found_page_and_reports_status(monkeypatch):
             mode="test",
         )
         async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
         ) as client:
             reply = await client.post("/invocations", json=run_input())
     events = decode_sse(reply.text)
