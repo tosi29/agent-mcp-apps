@@ -93,15 +93,13 @@ def main() -> None:
         prepare_sample(args.data)
         print(json.dumps({"row_count": 360, "path": str(args.data), "synthetic": True}))
         return
+    queries = {
+        "result": lambda: ResultStore(args.results).get(args.result_id),
+        "inspect": lambda: DataExplorer(args.data).describe(),
+        "query-demo": lambda: DataExplorer(args.data).aggregate("year", Filters("新宿区")),
+    }
     if args.command:
-        value = (
-            ResultStore(args.results).get(args.result_id)
-            if args.command == "result"
-            else DataExplorer(args.data).describe()
-            if args.command == "inspect"
-            else DataExplorer(args.data).aggregate("year", Filters("新宿区"))
-        )
-        print(json.dumps(value, ensure_ascii=False, allow_nan=False))
+        print(json.dumps(queries[args.command](), ensure_ascii=False, allow_nan=False))
         return
     uvicorn.run(
         create_app(data_path=args.data, results_dir=args.results),

@@ -14,11 +14,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
-_configured = False
-
 
 def configure_observability() -> None:
-    global _configured
     logging.disable(logging.NOTSET)
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -26,9 +23,7 @@ def configure_observability() -> None:
         stream=sys.__stderr__,
     )
     logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
-    if _configured:
-        return
-    _configured = True
+    # Preserve providers already configured by opentelemetry-instrument/ADOT or an earlier call.
     if isinstance(trace.get_tracer_provider(), TracerProvider):
         return
     resource = Resource.create({"service.name": "exploration-mcp"})
