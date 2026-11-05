@@ -38,8 +38,8 @@
 ## 秘密情報・外部通信・相談が必要な操作
 
 - 推論APIキーはローカルでは `agent/.env`、AgentCoreでは事前作成したParameter StoreのSecureStringを使う。Next.js側やブラウザへコピーしない。
-- Parameter Storeの値をTerraformで取得・管理しない。AgentCore V2の起動時にキーを取得せず、各runで取得してモデルに渡す。プロセスの環境変数やファイルへコピーしない。
-- TavilyのAPIキーも同じ扱いで、ローカルは `agent/.env`、AgentCoreはSecureStringを使う。推論キーと異なり、`web_search`・`web_fetch` の実行ごとに取得する。
+- Parameter Storeの値をTerraformで取得・管理しない。AgentCore V2の起動時スナップショットへ含めないよう、キーは初回利用時に取得してメモリに保持する。プロセスの環境変数やファイルへコピーしない。キーの変更は再起動で反映する。
+- TavilyのAPIキーも同じ扱いで、ローカルは `agent/.env`、AgentCoreはSecureStringを使う。
 - `web_search` でモデルに渡す引数は `query` のみとし、取得件数・抜粋長・回数の上限をアプリ側で固定する。検索クエリは外部へ送られ、検索結果は未検証データとして扱う。
 - `web_fetch` でモデルに渡す引数は `url` のみとする。取得先のサイトはPoCとして制限しないが、取得はTavily Extract経由とし、エージェントから直接通信しない。本文の長さと回数の上限はアプリ側で固定し、本文も未検証データとして扱う。実データの導入前にURLの制限を見直す。
 - `.env`、実データ、実行ログ、Terraform state等をコミットしない。キーや認証ヘッダーをログ・ツール出力・資料へ表示しない。

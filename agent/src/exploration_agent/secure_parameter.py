@@ -1,11 +1,13 @@
-"""Read an existing SecureString on demand, after the V2 snapshot. Never cache the value."""
+"""Read an existing SecureString on first use, after the V2 snapshot, and keep it in memory."""
 
 from contextlib import closing
+from functools import cache
 
 import boto3
 from botocore.config import Config
 
 
+@cache
 def read_secure_parameter(name: str) -> str:
     # Create a fresh session after restore; never snapshot resolved AWS credentials or the API key.
     session = boto3.Session(region_name="ap-northeast-1")
@@ -21,4 +23,8 @@ def read_secure_parameter(name: str) -> str:
         raise RuntimeError("APIキーをParameter Storeから取得できませんでした") from None
     if parameter.get("Type") != "SecureString":
         raise ValueError("APIキーにはSecureStringパラメータを使用してください")
-    return parameter.get("Value", "")
+    value = parameter.get("Value", "").strip()
+    if not value:
+        # Raise so an empty value is not cached until the next restart.
+        raise ValueError("APIキーのパラメータが空です")
+    return value

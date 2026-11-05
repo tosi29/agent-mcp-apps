@@ -164,7 +164,7 @@ sakura_model_id               = "preview/Kimi-K2.7-Code"
 モデルIDは設定例。使用するAPIキーの契約・モデルの利用可否・無償枠の残りを利用者が確認する。
 名前とモデルIDを両方省略すればfixture、両方指定すればさくらとなる。
 AgentCoreの実行ロールには、そのパラメータ1つの `ssm:GetParameter` だけを付与する。
-起動・ページ表示ではキーを取得せず、AgentCoreが各runで復号取得する。Next.jsはキーを受け取らない。
+起動・ページ表示ではキーを取得せず、AgentCoreが初回のrunで復号取得してメモリに保持する。キーの変更はRuntimeの再起動で反映する。Next.jsはキーを受け取らない。
 
 SSM対応の新しいエージェントイメージを `node scripts/push-images.mjs agent` でpushしてから切り替える。
 旧fixture専用イメージのまま設定だけを変更しない。Next.jsの接続モード表示も更新するため、Web用ZIPも再ビルド・配備する。
@@ -177,7 +177,7 @@ apply前に、さくらと同じ条件でSecureStringを `/agent-mcp-apps/tavily
 
 AgentCoreでは `web_search` と `web_fetch` が常に登録される。パラメータがなければ、そのツール呼び出しだけが失敗する。
 実行ロールにはそのパラメータ1つの `ssm:GetParameter` だけを付与する。
-キーはAgentCoreがツールの実行ごとに取得し、Terraform・Next.jsは値を扱わない。
+キーはAgentCoreが初回のツール実行で取得してメモリに保持し、Terraform・Next.jsは値を扱わない。
 対応するエージェントイメージのpushと、push・apply・実API検証前の確認はさくらの場合と同じ。
 
 ## AWS・Azureのドキュメント用MCP

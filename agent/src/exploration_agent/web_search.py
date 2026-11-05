@@ -40,7 +40,7 @@ def web_search_enabled() -> bool:
 
 
 def _api_key() -> str:
-    # Read on each call so rotation applies and the key stays out of agent state and snapshots.
+    # Read on first use so the key stays out of agent state and startup snapshots.
     name = _parameter_name()
     key = (read_secure_parameter(name) if name else _local_key()).strip()
     if not key:

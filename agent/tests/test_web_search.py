@@ -140,15 +140,14 @@ def test_failure_is_generic_and_does_not_leak_or_follow(reply, caplog):
     assert KEY not in str(error.value) and KEY not in caplog.text
 
 
-def test_parameter_store_key_is_read_per_call_without_changing_environment(monkeypatch):
+def test_parameter_store_key_is_read_on_use_without_changing_environment(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY_PARAMETER_NAME", "/test/tavily")
     monkeypatch.setenv("TAVILY_API_KEY", "local-must-not-be-used")
     names = []
-    keys = iter(["key-before-rotation", "key-after-rotation"])
 
     def read(name):
         names.append(name)
-        return next(keys)
+        return "key-from-parameter"
 
     monkeypatch.setattr(web_search, "read_secure_parameter", read)
     sent = []
@@ -160,9 +159,8 @@ def test_parameter_store_key_is_read_per_call_without_changing_environment(monke
     search = build_web_search_tool(transport=tavily(handle))
     assert names == []
     search(query="q")
-    search(query="q")
-    assert names == ["/test/tavily"] * 2
-    assert sent == ["Bearer key-before-rotation", "Bearer key-after-rotation"]
+    assert names == ["/test/tavily"]
+    assert sent == ["Bearer key-from-parameter"]
     assert web_search.os.environ["TAVILY_API_KEY"] == "local-must-not-be-used"
 
 

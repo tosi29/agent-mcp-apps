@@ -17,6 +17,7 @@ PARAMS = {"Name": NAME, "WithDecryption": True}
 
 @pytest.fixture
 def ssm(monkeypatch):
+    secure_parameter.read_secure_parameter.cache_clear()
     client = boto3.client(
         "ssm",
         region_name="ap-northeast-1",
@@ -36,9 +37,10 @@ def ssm(monkeypatch):
     with Stubber(client) as stub:
         yield stub, sessions
         stub.assert_no_pending_responses()
+    secure_parameter.read_secure_parameter.cache_clear()
 
 
-async def test_key_is_read_after_snapshot_per_run_without_changing_environment(
+async def test_key_is_read_once_on_first_run_without_changing_environment(
     ssm, tmp_path, monkeypatch
 ):
     stub, sessions = ssm
@@ -50,12 +52,11 @@ async def test_key_is_read_after_snapshot_per_run_without_changing_environment(
         return FixtureModel()  # No actual Sakura API call in this test.
 
     monkeypatch.setattr(SakuraSettings, "build_model", build)
-    for key in ["test-key-before-rotation", "test-key-after-rotation"]:
-        stub.add_response(
-            "get_parameter",
-            {"Parameter": {"Name": NAME, "Type": "SecureString", "Value": key, "Version": 1}},
-            PARAMS,
-        )
+    stub.add_response(
+        "get_parameter",
+        {"Parameter": {"Name": NAME, "Type": "SecureString", "Value": "test-key", "Version": 1}},
+        PARAMS,
+    )
     app = create_agentcore_app()
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://runtime.internal:8080"
@@ -66,10 +67,23 @@ async def test_key_is_read_after_snapshot_per_run_without_changing_environment(
             response = await client.post("/invocations", json=run_input(runId=run_id))
             events = decode_sse(response.text)
             assert events[-1]["type"] == "RUN_FINISHED"
-            assert "test-key-" not in response.text
-    assert keys == ["test-key-before-rotation", "test-key-after-rotation"]
-    assert sessions == [{"region_name": "ap-northeast-1"}] * 2
+            assert "test-key" not in response.text
+    assert keys == ["test-key", "test-key"]
+    assert sessions == [{"region_name": "ap-northeast-1"}]
     assert parameter_store.os.environ["SAKURA_API_KEY"] == "local-environment-must-not-change"
+
+
+def test_failed_read_is_retried_on_next_use(ssm):
+    stub, _ = ssm
+    stub.add_client_error("get_parameter", "ThrottlingException", expected_params=PARAMS)
+    stub.add_response(
+        "get_parameter",
+        {"Parameter": {"Name": NAME, "Type": "SecureString", "Value": "test-key", "Version": 1}},
+        PARAMS,
+    )
+    with pytest.raises(RuntimeError):
+        secure_parameter.read_secure_parameter(NAME)
+    assert secure_parameter.read_secure_parameter(NAME) == "test-key"
 
 
 @pytest.mark.parametrize("kind", ["access_denied", "plain_string", "empty_value"])

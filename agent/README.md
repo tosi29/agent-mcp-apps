@@ -68,7 +68,7 @@ CLIの `--no-stream` はモデルの非ストリーム動作、`--sse` は標準
 
 ローカルでは `.env` の `TAVILY_API_KEY`、AgentCoreでは `TAVILY_API_KEY_PARAMETER_NAME` で指定した
 SecureStringからキーを読む。両方あればパラメータを優先する。どちらもなければツールを登録しない。
-キーはツールの実行ごとに取得し、起動時スナップショットやエージェントの状態へ保持しない。
+キーは初回利用時に取得してメモリに保持し、起動時スナップショットやエージェントの状態へ含めない。変更は再起動で反映する。
 キーの取得や検索に失敗してもそのツール呼び出しだけが失敗し、モデルには固定の失敗メッセージを返す。
 
 モデルが指定できるのは400文字以内の `query` だけで、URLや検索オプションは指定できない。
@@ -130,7 +130,7 @@ RAWと暗号化推論値は送信しない。推論の返却有無はモデル�
 `Dockerfile` はエージェント用ARM64イメージを作る。ParquetとDuckDBは含めない。
 既定はfixtureで、さくら接続時は `EXPLORER_MODEL_MODE=sakura`、
 `SAKURA_API_KEY_PARAMETER_NAME`、`SAKURA_MODEL_ID` を設定する。
-SSM SecureStringの値は各runで取得し、起動時スナップショットへ固定しない。
+SSM SecureStringの値は初回のrunで取得してメモリに保持し、起動時スナップショットへ含めない。変更は再起動で反映する。
 Web検索のキーは `TAVILY_API_KEY_PARAMETER_NAME` で指定する。Terraform配備では常に設定される。
 
 MCPは `MCP_RUNTIME_ARN` で東京リージョンのRuntimeを指定する。
