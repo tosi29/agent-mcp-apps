@@ -85,9 +85,8 @@ class SakuraSettings:
 
 
 class RequestHooks(HookProvider):
-    def __init__(self, emit: Callable[..., None], max_model_calls: int):
+    def __init__(self, emit: Callable[..., None]):
         self.emit = emit
-        self.max_model_calls = max_model_calls
         self.model_calls = 0
         self.tool_calls = 0
         self.tool_errors = 0
@@ -98,8 +97,6 @@ class RequestHooks(HookProvider):
         registry.add_callback(AfterToolCallEvent, self.after_tool)
 
     def before_model(self, event: BeforeModelCallEvent) -> None:
-        if self.model_calls >= self.max_model_calls:
-            raise RuntimeError("model call budget exceeded")
         self.model_calls += 1
 
     def before_tool(self, event: BeforeToolCallEvent) -> None:
@@ -135,15 +132,12 @@ async def stream_question(
     *,
     mcp_url: str | None = None,
     mcp_runtime_arn: str | None = None,
-    max_model_calls: int = 4,
-    timeout_seconds: float = 120,
+    timeout_seconds: float = 300,
 ) -> AsyncIterator[dict[str, Any]]:
     """One question per fresh agent. No durable sessions or raw SDK events on the wire."""
     configure_observability()
     if not prompt.strip() or len(prompt) > 4000:
         raise ValueError("prompt must contain 1–4000 characters")
-    if not 1 <= max_model_calls <= 10:
-        raise ValueError("max_model_calls must be 1–10")
     request_id, started = uuid4().hex, time.monotonic()
     queue: asyncio.Queue[dict | None] = asyncio.Queue()
     sequence = 0
@@ -162,7 +156,7 @@ async def stream_question(
             }
         )
 
-    hooks = RequestHooks(emit, max_model_calls)
+    hooks = RequestHooks(emit)
 
     async def produce() -> None:
         try:

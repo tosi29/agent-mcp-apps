@@ -85,7 +85,7 @@ resource "aws_lambda_function" "web" {
   source_code_hash = fileexists(local.web_zip) ? filebase64sha256(local.web_zip) : null
   layers           = ["arn:aws:lambda:ap-northeast-1:753240598075:layer:LambdaAdapterLayerArm64:30"] # Web Adapter 1.1.0
   memory_size      = 512
-  timeout          = 150
+  timeout          = 330
 
   environment {
     variables = {
@@ -188,7 +188,7 @@ resource "aws_api_gateway_integration" "web" {
   type                    = "AWS_PROXY"
   uri                     = "arn:${local.partition}:apigateway:ap-northeast-1:lambda:path/2021-11-15/functions/${aws_lambda_function.web[0].arn}/response-streaming-invocations"
   response_transfer_mode  = "STREAM"
-  timeout_milliseconds    = 155000
+  timeout_milliseconds    = 335000
 }
 
 resource "aws_lambda_permission" "api_gateway" {

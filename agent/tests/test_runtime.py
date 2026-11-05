@@ -185,36 +185,6 @@ async def test_provider_error_is_terminal_and_not_leaked(tmp_path):
     assert "private-secret" not in json.dumps(events)
 
 
-async def test_model_loop_has_a_hard_call_budget(tmp_path):
-    calls = 0
-
-    def handle(request):
-        nonlocal calls
-        calls += 1
-        return response(
-            completion(
-                tool_message("echo_text", {"text": "budget"}, f"call-{calls}"), "tool_calls"
-            ),
-            True,
-        )
-
-    async with AsyncOpenAI(
-        api_key="test",
-        max_retries=0,
-        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
-    ) as client:
-        events = [
-            e
-            async for e in stream_question(
-                "テスト",
-                OpenAIModel(client=client, model_id="mock"),
-                max_model_calls=2,
-            )
-        ]
-    assert calls == 2
-    assert events[-1]["status"] == "error"
-
-
 async def test_request_timeout(tmp_path):
     async def handle(request):
         await asyncio.sleep(1)

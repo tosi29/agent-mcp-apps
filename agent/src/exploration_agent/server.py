@@ -38,8 +38,7 @@ async def agui_events(
     *,
     mcp_url: str | None = None,
     mcp_runtime_arn: str | None = None,
-    max_model_calls: int = 4,
-    timeout_seconds: float = 120,
+    timeout_seconds: float = 300,
 ) -> AsyncIterator:
     deadline = asyncio.get_running_loop().time() + timeout_seconds
     async with (
@@ -59,7 +58,6 @@ async def agui_events(
             run,
             template,
             app_loader=partial(load_app_resources, tools, mcp_url, mcp_runtime_arn),
-            max_model_calls=max_model_calls,
             timeout_seconds=remaining,
         ):
             yield event
@@ -70,10 +68,9 @@ async def _agui_events(
     template: Agent,
     *,
     app_loader: Callable[[], Awaitable[dict[str, dict]]],
-    max_model_calls: int,
     timeout_seconds: float,
 ) -> AsyncIterator:
-    """Use the maintained Strands adapter, with fresh per-request budgets and tools."""
+    """Use the maintained Strands adapter, with fresh per-request hooks and tools."""
     request_id = uuid4().hex
     previews: dict[str, dict] = {}
     statuses: dict[str, dict] = {}
@@ -90,7 +87,7 @@ async def _agui_events(
         if status := statuses.pop(context.tool_use_id, None):
             yield CustomEvent(type=EventType.CUSTOM, name="tool_status", value=status)
 
-    hooks = RequestHooks(observe, max_model_calls)
+    hooks = RequestHooks(observe)
     adapter = StrandsAgent(
         agent=template,
         name="explorer",

@@ -203,21 +203,7 @@ async def test_request_rejection_and_origin_guard(tmp_path):
         ).status_code == 422
 
 
-async def test_agui_budget_and_error_are_terminal(tmp_path):
-    events = [
-        e.model_dump(mode="json", by_alias=True)
-        async for e in agui_events(
-            RunAgentInput.model_validate(run_input()),
-            FixtureModel(),
-            max_model_calls=1,
-        )
-    ]
-    assert events[-1]["type"] == "RUN_ERROR"
-    assert not any(e["type"] == "RUN_FINISHED" for e in events)
-    assert "Traceback" not in json.dumps(events)
-
-
-async def test_agui_timeout(tmp_path):
+async def test_agui_timeout_is_terminal(tmp_path):
     events = [
         e.model_dump(mode="json", by_alias=True)
         async for e in agui_events(
@@ -227,6 +213,8 @@ async def test_agui_timeout(tmp_path):
         )
     ]
     assert events[-1]["type"] == "RUN_ERROR"
+    assert not any(e["type"] == "RUN_FINISHED" for e in events)
+    assert "Traceback" not in json.dumps(events)
     assert not any(e["type"] == "RUN_FINISHED" for e in events)
 
 

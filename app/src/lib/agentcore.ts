@@ -37,7 +37,7 @@ export async function fetchAgentCore(_url: string, init: RequestInit): Promise<R
   const input = JSON.parse(init.body) as Run;
   const run = { threadId: input.threadId, runId: input.runId };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 130_000);
+  const timer = setTimeout(() => controller.abort(), 310_000);
   const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
   const cleanup = () => { clearTimeout(timer); controller.abort(); };
   let source: Readable | undefined;
