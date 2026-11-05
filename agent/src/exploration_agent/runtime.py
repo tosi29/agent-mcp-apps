@@ -24,7 +24,7 @@ from strands.models.openai import OpenAIModel
 
 from exploration_agent.docs_mcp import DocsMCPHook, build_docs_clients, managed_agent
 from exploration_agent.mcp_apps import load_app_resources
-from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
+from exploration_agent.mcp_tools import MCPPreviewHook, build_mcp_clients
 from exploration_agent.observability import configure_observability, log_callback
 from exploration_agent.tools import echo_text
 from exploration_agent.web_search import build_web_tools, web_search_enabled
@@ -162,24 +162,20 @@ async def stream_question(
         try:
             stop_reason = None
             async with asyncio.timeout(timeout_seconds):
-                async with (
-                    connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as mcp_tools,
-                    managed_agent(
-                        model=model,
-                        system_prompt=SYSTEM_PROMPT,
-                        tools=build_tools() + mcp_tools + build_docs_clients(),
-                        hooks=[
-                            hooks,
-                            MCPPreviewHook(
-                                emit,
-                                partial(load_app_resources, mcp_tools, mcp_url, mcp_runtime_arn),
-                            ),
-                            DocsMCPHook(),
-                        ],
-                        callback_handler=log_callback,
-                        retry_strategy=None,
-                    ) as agent,
-                ):
+                async with managed_agent(
+                    model=model,
+                    system_prompt=SYSTEM_PROMPT,
+                    tools=build_tools()
+                    + build_mcp_clients(mcp_url, mcp_runtime_arn)
+                    + build_docs_clients(),
+                    hooks=[
+                        hooks,
+                        MCPPreviewHook(emit, partial(load_app_resources, mcp_url, mcp_runtime_arn)),
+                        DocsMCPHook(),
+                    ],
+                    callback_handler=log_callback,
+                    retry_strategy=None,
+                ) as agent:
                     async for event in agent.stream_async(prompt):
                         if isinstance(event.get("data"), str):
                             emit("text_delta", text=event["data"])

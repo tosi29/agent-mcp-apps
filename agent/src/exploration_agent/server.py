@@ -23,7 +23,7 @@ from strands.models.model import Model
 from exploration_agent.docs_mcp import DocsMCPHook, build_docs_clients, managed_agent
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_apps import load_app_resources
-from exploration_agent.mcp_tools import MCPPreviewHook, connect_mcp
+from exploration_agent.mcp_tools import MCPPreviewHook, build_mcp_clients
 from exploration_agent.observability import configure_observability, log_callback
 from exploration_agent.runtime import SYSTEM_PROMPT, RequestHooks, SakuraSettings, build_tools
 
@@ -41,23 +41,20 @@ async def agui_events(
     timeout_seconds: float = 300,
 ) -> AsyncIterator:
     deadline = asyncio.get_running_loop().time() + timeout_seconds
-    async with (
-        connect_mcp(mcp_url, runtime_arn=mcp_runtime_arn) as tools,
-        managed_agent(
-            model=model,
-            system_prompt=SYSTEM_PROMPT,
-            tools=build_tools() + tools + build_docs_clients(),
-            callback_handler=log_callback,
-            retry_strategy=None,
-        ) as template,
-    ):
+    async with managed_agent(
+        model=model,
+        system_prompt=SYSTEM_PROMPT,
+        tools=build_tools() + build_mcp_clients(mcp_url, mcp_runtime_arn) + build_docs_clients(),
+        callback_handler=log_callback,
+        retry_strategy=None,
+    ) as template:
         remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
             raise TimeoutError("MCP connection exceeded the request budget")
         async for event in _agui_events(
             run,
             template,
-            app_loader=partial(load_app_resources, tools, mcp_url, mcp_runtime_arn),
+            app_loader=partial(load_app_resources, mcp_url, mcp_runtime_arn),
             timeout_seconds=remaining,
         ):
             yield event
@@ -67,7 +64,7 @@ async def _agui_events(
     run: RunAgentInput,
     template: Agent,
     *,
-    app_loader: Callable[[], Awaitable[dict[str, dict]]],
+    app_loader: Callable[[], Awaitable[dict]],
     timeout_seconds: float,
 ) -> AsyncIterator:
     """Use the maintained Strands adapter, with fresh per-request hooks and tools."""

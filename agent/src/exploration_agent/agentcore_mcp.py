@@ -34,8 +34,7 @@ class RuntimeAuth(httpx2.Auth):
 
     requires_request_body = True
 
-    def __init__(self, url: str):
-        self.url = url
+    def __init__(self):
         self.session_id = str(uuid4())
 
     def _signed_headers(self, request: httpx2.Request) -> dict[str, str]:
@@ -54,8 +53,6 @@ class RuntimeAuth(httpx2.Auth):
         return dict(signed.headers)
 
     async def async_auth_flow(self, request):
-        if str(request.url) != self.url:
-            raise ValueError("MCPの署名先が設定したRuntimeと異なります")
         request.headers["Mcp-Session-Id"] = self.session_id
         request.headers.update(await asyncio.to_thread(self._signed_headers, request))
         response = yield request
@@ -67,7 +64,7 @@ class RuntimeAuth(httpx2.Auth):
 async def runtime_transport(arn: str):
     url = runtime_url(arn)
     async with httpx2.AsyncClient(
-        auth=RuntimeAuth(url),
+        auth=RuntimeAuth(),
         timeout=httpx2.Timeout(60, connect=10),
         follow_redirects=False,
     ) as client:

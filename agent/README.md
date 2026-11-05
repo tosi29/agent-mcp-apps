@@ -115,7 +115,7 @@ MCPの `content` はモデル用の要約と最大3行、`structuredContent` は
 検索結果の全量（上限200行）はMCP側に一時保存する。エージェントは保存しない。
 MCP Appsツールでは結果の `_meta.preview` をUIへ送り、モデルの会話状態から取り除く。
 UIが必要になったときだけ、Apps capabilityを明示した別のリソース専用MCP接続でHTMLを取得する。
-同じrun内ではHTMLを再利用する。HTMLは最大768KiB、許可した `ui://` リソース1つに制限する。
+同じrun内ではHTMLを再利用する。取得するのはコードで固定した `ui://` リソース1つだけ。
 HTML・ツール引数・UI専用結果は `data_result.app` に載せ、会話メッセージへコピーしない。
 任意SQLを受け付けず、列・集計・条件値の制御はMCP側で行う。
 
