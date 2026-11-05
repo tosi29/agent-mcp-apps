@@ -9,10 +9,11 @@ import httpx2
 import pytest
 from ag_ui.core import RunAgentInput
 from openai import AsyncOpenAI
+from strands import Agent
 from strands.models.openai import OpenAIModel
 from test_agui_run import completion, response, tool_message
 
-from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.agui import agui_events
 from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
 
@@ -88,7 +89,7 @@ async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
         )
         events = [
             e.model_dump(mode="json", by_alias=True)
-            async for e in agui_events(run, model, mcp_url=mcp_url)
+            async for e in agui_events(run, lambda: model, mcp_url=mcp_url)
         ]
     assert events[-1]["type"] == "RUN_FINISHED", events
     preview = next(e["value"] for e in events if e.get("name") == "data_result")
@@ -219,7 +220,23 @@ async def test_setup_failure_is_terminal_without_exception_details(tmp_path):
         reply = await client.post("/invocations", json=run_input())
     events = decode_sse(reply.text)
     assert [e["type"] for e in events] == ["RUN_STARTED", "RUN_ERROR"]
-    assert events[-1]["code"] == "AGENT_SETUP_FAILED"
+    assert events[-1]["code"] == "AGENT_RUN_FAILED"
+    assert "private-detail" not in reply.text
+
+
+async def test_cleanup_failure_after_finish_does_not_reopen_the_run(tmp_path, monkeypatch):
+    def fail(_agent):
+        raise RuntimeError("private-detail")
+
+    monkeypatch.setattr(Agent, "cleanup", fail)
+    app = create_app(FixtureModel, mode="fixture")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        reply = await client.post("/invocations", json=run_input())
+    events = decode_sse(reply.text)
+    assert sum(e["type"] == "RUN_STARTED" for e in events) == 1
+    assert events[-1]["type"] == "RUN_FINISHED"
     assert "private-detail" not in reply.text
 
 
@@ -254,7 +271,7 @@ async def test_agui_timeout_is_terminal(tmp_path):
         e.model_dump(mode="json", by_alias=True)
         async for e in agui_events(
             RunAgentInput.model_validate(run_input()),
-            FixtureModel(),
+            FixtureModel,
             timeout_seconds=0.02,
         )
     ]

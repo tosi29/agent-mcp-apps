@@ -6,7 +6,7 @@ from ag_ui_strands.agent import _extract_tool_result_data
 from test_server import run_input
 
 from exploration_agent.agent import managed_agent
-from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.agui import agui_events
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_clients import docs as docs_mcp
 from exploration_agent.mcp_clients.docs import (
@@ -97,7 +97,7 @@ async def test_agui_run_finishes_with_docs_clients_through_the_adapter(monkeypat
     monkeypatch.setattr("exploration_agent.agent.build_docs_clients", record)
     events = [
         event.type.value
-        async for event in agui_events(RunAgentInput.model_validate(run_input()), FixtureModel())
+        async for event in agui_events(RunAgentInput.model_validate(run_input()), FixtureModel)
     ]
     assert events[0] == "RUN_STARTED"
     assert events[-1] == "RUN_FINISHED"

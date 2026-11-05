@@ -113,5 +113,6 @@ def test_invalid_parameter_fails_without_leaking_key(ssm, kind):
 def test_sakura_mode_cannot_silently_fall_back_to_fixture(monkeypatch):
     monkeypatch.setenv("EXPLORER_MODEL_MODE", "sakura")
     monkeypatch.delenv("SAKURA_API_KEY_PARAMETER_NAME", raising=False)
-    with pytest.raises(ValueError, match="SAKURA_API_KEY_PARAMETER_NAME"):
+    monkeypatch.delenv("SAKURA_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="SAKURA_API_KEY"):
         create_agentcore_app()

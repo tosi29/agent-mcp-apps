@@ -12,7 +12,7 @@ from ag_ui.core import RunAgentInput
 from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 
-from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.agui import agui_events
 from exploration_agent.model import SakuraSettings
 
 
@@ -110,7 +110,7 @@ def run_events(model, prompt="テスト", **kwargs):
             "forwardedProps": {},
         }
     )
-    return agui_events(run, model, **kwargs)
+    return agui_events(run, lambda: model, **kwargs)
 
 
 async def collect(model, prompt="テスト", **kwargs):

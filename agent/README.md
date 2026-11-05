@@ -68,11 +68,12 @@ Strands・OpenAIクライアントの自動再試行と、有料モデルへの�
 src/exploration_agent/
 ├── agent.py             # プロンプトとツールの組み立て。全入口で共通のエージェント定義
 ├── hooks.py             # 実行回数の集計とツールイベント
-├── model.py             # さくらのモデル設定
+├── agui.py              # 1回の実行のAG-UIイベント変換と失敗時の処理
+├── model.py             # モデルの選択とさくらの設定
 ├── fixture_model.py     # 外部API不要の固定応答
 ├── secure_parameter.py  # Parameter Storeの遅延読み込み
 ├── observability.py     # ログ・トレース・メトリクス
-├── entrypoints/         # 起動の入口：server（AG-UI）、agui（イベント変換）、agentcore
+├── entrypoints/         # 起動の入口：server（AG-UI）、agentcore
 ├── tools/               # 通常のPythonツール：echo、web（web_search・web_fetch）
 └── mcp_clients/         # MCPへの接続：exploration、apps、docs、agentcore（SigV4署名）
 ```

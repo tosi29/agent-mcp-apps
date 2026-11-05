@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import aclosing
 from functools import partial
 from typing import Any
 from uuid import uuid4
@@ -23,37 +24,9 @@ from exploration_agent.observability import log_callback
 logger = logging.getLogger(__name__)
 
 
-async def agui_events(
-    run: RunAgentInput,
-    model: Model,
-    *,
-    mcp_url: str | None = None,
-    mcp_runtime_arn: str | None = None,
-    timeout_seconds: float = 300,
-) -> AsyncIterator:
-    deadline = asyncio.get_running_loop().time() + timeout_seconds
-    async with exploration_agent(
-        model, mcp_url=mcp_url, mcp_runtime_arn=mcp_runtime_arn
-    ) as template:
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            raise TimeoutError("MCP connection exceeded the request budget")
-        async for event in _agui_events(
-            run,
-            template,
-            app_loader=partial(load_app_resources, mcp_url, mcp_runtime_arn),
-            timeout_seconds=remaining,
-        ):
-            yield event
-
-
-async def _agui_events(
-    run: RunAgentInput,
-    template: Agent,
-    *,
-    app_loader: Callable[[], Awaitable[dict]],
-    timeout_seconds: float,
-) -> AsyncIterator:
+def _build_adapter(
+    template: Agent, app_loader: Callable[[], Awaitable[dict]]
+) -> tuple[StrandsAgent, RequestHooks]:
     """Use the maintained Strands adapter, with fresh per-request hooks and tools."""
     request_id = uuid4().hex
     previews: dict[str, dict] = {}
@@ -88,9 +61,13 @@ async def _agui_events(
             },
         ),
     )
+    return adapter, hooks
+
+
+def _trusted_input(run: RunAgentInput) -> RunAgentInput:
     # Do not expose frontend tools, arbitrary UI state, or injected A2UI configuration.
     # Reasoning is displayed by the client, but is not replayed as conversation input.
-    trusted_run = run.model_copy(
+    return run.model_copy(
         update={
             "messages": [m for m in run.messages if m.role in {"user", "assistant", "tool"}],
             "tools": [],
@@ -100,52 +77,69 @@ async def _agui_events(
             "resume": None,
         }
     )
-    started = False
+
+
+async def agui_events(
+    run: RunAgentInput,
+    model_factory: Callable[[], Model],
+    *,
+    mcp_url: str | None = None,
+    mcp_runtime_arn: str | None = None,
+    timeout_seconds: float = 300,
+) -> AsyncIterator:
+    """Stream one run. Every failure ends it once, with a fixed message for the client."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout_seconds
-    stream = adapter.run(trusted_run)
+    started = finished = False
     try:
-        while True:
-            # The endpoint runs each step in its own task, so asyncio.timeout() cannot span steps.
-            try:
-                event = await asyncio.wait_for(anext(stream), deadline - loop.time())
-            except StopAsyncIteration:
-                break
-            if event.type == EventType.RUN_STARTED:
-                started = True
-            if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
-                continue
-            if event.type == EventType.RUN_ERROR:
-                logger.error("Agent run failed run_id=%s error=%s", run.run_id, event.message)
-                yield RunErrorEvent(
-                    type=EventType.RUN_ERROR,
-                    code="AGENT_RUN_FAILED",
-                    message="実行に失敗しました。接続・設定・実行上限を確認してください。",
-                )
-                return
-            if event.type == EventType.RUN_FINISHED:
-                yield CustomEvent(
-                    type=EventType.CUSTOM,
-                    name="run_metrics",
-                    value={
-                        "model_calls": hooks.model_calls,
-                        "tool_calls": hooks.tool_calls,
-                        "tool_errors": hooks.tool_errors,
-                    },
-                )
-            yield event
-    except Exception:
-        logger.exception("Agent run failed run_id=%s", run.run_id)
-        if not started:
-            yield RunStartedEvent(
-                type=EventType.RUN_STARTED,
-                thread_id=run.thread_id,
-                run_id=run.run_id,
+        # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
+        model = await asyncio.to_thread(model_factory)
+        async with exploration_agent(
+            model, mcp_url=mcp_url, mcp_runtime_arn=mcp_runtime_arn
+        ) as template:
+            adapter, hooks = _build_adapter(
+                template, partial(load_app_resources, mcp_url, mcp_runtime_arn)
             )
-        yield RunErrorEvent(
-            type=EventType.RUN_ERROR,
-            code="AGENT_RUN_FAILED",
-            message="実行に失敗しました。接続・設定・実行上限を確認してください。",
+            async with aclosing(adapter.run(_trusted_input(run))) as stream:
+                while True:
+                    # The endpoint runs each step in its own task, so asyncio.timeout()
+                    # cannot span steps.
+                    try:
+                        event = await asyncio.wait_for(anext(stream), deadline - loop.time())
+                    except StopAsyncIteration:
+                        break
+                    if event.type == EventType.RUN_STARTED:
+                        started = True
+                    if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
+                        continue
+                    if event.type == EventType.RUN_ERROR:
+                        logger.error(
+                            "Agent run failed run_id=%s error=%s", run.run_id, event.message
+                        )
+                        break
+                    if event.type == EventType.RUN_FINISHED:
+                        finished = True
+                        yield CustomEvent(
+                            type=EventType.CUSTOM,
+                            name="run_metrics",
+                            value={
+                                "model_calls": hooks.model_calls,
+                                "tool_calls": hooks.tool_calls,
+                                "tool_errors": hooks.tool_errors,
+                            },
+                        )
+                    yield event
+    except Exception:
+        # The endpoint would send str(error) to the client. Log it and send a fixed message.
+        logger.exception("Agent run failed run_id=%s", run.run_id)
+    if finished:
+        return
+    if not started:
+        yield RunStartedEvent(
+            type=EventType.RUN_STARTED, thread_id=run.thread_id, run_id=run.run_id
         )
-    finally:
-        await stream.aclose()
+    yield RunErrorEvent(
+        type=EventType.RUN_ERROR,
+        code="AGENT_RUN_FAILED",
+        message="実行に失敗しました。接続・設定・実行上限を確認してください。",
+    )

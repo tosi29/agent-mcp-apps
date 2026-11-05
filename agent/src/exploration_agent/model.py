@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from strands.models.model import Model
 from strands.models.openai import OpenAIModel
 
+from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.secure_parameter import read_secure_parameter
 
 
@@ -41,3 +44,14 @@ def build_sakura_model_from_parameter_store() -> Model:
     key = read_secure_parameter(os.environ["SAKURA_API_KEY_PARAMETER_NAME"])
     # Do not copy the key into process-wide environment variables or persistent artifacts.
     return SakuraSettings.from_env(api_key=key).build_model()
+
+
+def build_model_factory(mode: str, *, compare: bool = False) -> Callable[[], Model]:
+    """Check settings at startup. A SecureString is still read only by the returned factory."""
+    if mode == "fixture":
+        return partial(FixtureModel, compare=compare)
+    if mode != "sakura":
+        raise ValueError("EXPLORER_MODEL_MODEはfixtureまたはsakuraを指定してください")
+    if os.environ.get("SAKURA_API_KEY_PARAMETER_NAME", "").strip():
+        return build_sakura_model_from_parameter_store
+    return SakuraSettings.from_env().build_model

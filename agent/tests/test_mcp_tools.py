@@ -13,7 +13,7 @@ from strands.models.openai import OpenAIModel
 from test_agui_run import completion, response, tool_message
 from test_server import decode_sse, run_input
 
-from exploration_agent.entrypoints.agui import agui_events
+from exploration_agent.agui import agui_events
 from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_clients import agentcore as agentcore_mcp
@@ -25,7 +25,7 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
         event.model_dump(mode="json", by_alias=True)
         async for event in agui_events(
             RunAgentInput.model_validate(run_input()),
-            FixtureModel(compare=True),
+            lambda: FixtureModel(compare=True),
             mcp_url=mcp_url,
         )
     ]
@@ -74,7 +74,7 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
             event.model_dump(mode="json", by_alias=True)
             async for event in agui_events(
                 RunAgentInput.model_validate(run_input()),
-                OpenAIModel(client=client, model_id="mock"),
+                lambda: OpenAIModel(client=client, model_id="mock"),
                 mcp_url=mcp_url,
             )
         ]
@@ -104,7 +104,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
         loads.append(True)
         return await load_app_resources(*args)
 
-    monkeypatch.setattr("exploration_agent.entrypoints.agui.load_app_resources", load)
+    monkeypatch.setattr("exploration_agent.agui.load_app_resources", load)
 
     def handle(request):
         requests.append(json.loads(request.content))
@@ -133,7 +133,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
             event.model_dump(mode="json", by_alias=True)
             async for event in agui_events(
                 RunAgentInput.model_validate(run_input()),
-                OpenAIModel(client=client, model_id="mock", stream=not parallel),
+                lambda: OpenAIModel(client=client, model_id="mock", stream=not parallel),
                 mcp_url=mcp_url,
             )
         ]
