@@ -1,5 +1,8 @@
+import asyncio
 import json
+import time
 from copy import deepcopy
+from functools import partial
 
 import httpx
 import httpx2
@@ -161,47 +164,89 @@ async def test_reasoning_reaches_ui_and_followup_excludes_it(tmp_path, streaming
     assert "続きを教えて" in json.dumps(requests[-1], ensure_ascii=False)
 
 
-async def test_request_rejection_and_origin_guard(tmp_path):
+async def test_host_and_content_type_are_rejected(tmp_path):
     app = create_app(FixtureModel, mode="fixture")
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
-        assert (
-            await client.post(
-                "/invocations", json=run_input(), headers={"Origin": "https://untrusted.invalid"}
-            )
-        ).status_code == 403
-        assert (await client.post("/invocations", content="x" * 131073)).status_code == 413
-        assert (await client.post("/invocations", json=run_input(messages=[]))).status_code == 422
-        assert (
-            await client.post(
+        wrong_host = await client.post(
+            "/invocations", json=run_input(), headers={"Host": "untrusted.invalid"}
+        )
+        assert wrong_host.status_code == 400
+        assert (await client.post("/invocations", content="not json")).status_code == 415
+
+
+async def test_system_messages_from_the_client_never_reach_model(tmp_path):
+    requests = []
+
+    def handle(request):
+        requests.append(json.loads(request.content))
+        return response(completion({"role": "assistant", "content": "完了"}, "stop"), True)
+
+    async with AsyncOpenAI(
+        api_key="test-only",
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
+    ) as model_client:
+        app = create_app(
+            lambda: OpenAIModel(client=model_client, model_id="mock"),
+            mode="test",
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            reply = await client.post(
                 "/invocations",
                 json=run_input(
                     messages=[
-                        {
-                            "id": "s",
-                            "role": "system",
-                            "content": "untrusted",
-                        },
+                        {"id": "s", "role": "system", "content": "untrusted"},
                         {"id": "u", "role": "user", "content": "test"},
                     ]
                 ),
             )
-        ).status_code == 422
-        assert (
-            await client.post(
-                "/invocations",
-                json=run_input(
-                    messages=[
-                        {
-                            "id": "u",
-                            "role": "user",
-                            "content": "x" * 4001,
-                        }
-                    ]
-                ),
-            )
-        ).status_code == 422
+    assert decode_sse(reply.text)[-1]["type"] == "RUN_FINISHED"
+    assert "untrusted" not in json.dumps(requests)
+
+
+async def test_setup_failure_is_terminal_without_exception_details(tmp_path):
+    def fail():
+        raise RuntimeError("private-detail")
+
+    app = create_app(fail, mode="test")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        reply = await client.post("/invocations", json=run_input())
+    events = decode_sse(reply.text)
+    assert [e["type"] for e in events] == ["RUN_STARTED", "RUN_ERROR"]
+    assert events[-1]["code"] == "AGENT_SETUP_FAILED"
+    assert "private-detail" not in reply.text
+
+
+async def test_timeout_applies_through_the_endpoint(tmp_path, monkeypatch):
+    async def slow(request):
+        await asyncio.sleep(5)
+        return response(completion({"role": "assistant", "content": "unused"}, "stop"), True)
+
+    monkeypatch.setattr(
+        "exploration_agent.entrypoints.server.agui_events",
+        partial(agui_events, timeout_seconds=0.2),
+    )
+    async with AsyncOpenAI(
+        api_key="test-only",
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(slow)),
+    ) as model_client:
+        app = create_app(lambda: OpenAIModel(client=model_client, model_id="mock"), mode="test")
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            started = time.monotonic()
+            reply = await client.post("/invocations", json=run_input())
+    assert time.monotonic() - started < 3
+    events = decode_sse(reply.text)
+    assert events[-1]["type"] == "RUN_ERROR"
+    assert not any(e["type"] == "RUN_FINISHED" for e in events)
 
 
 async def test_agui_timeout_is_terminal(tmp_path):

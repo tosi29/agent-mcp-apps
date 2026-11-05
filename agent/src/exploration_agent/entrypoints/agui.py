@@ -88,9 +88,11 @@ async def _agui_events(
             },
         ),
     )
-    # Do not expose frontend tools, arbitrary UI state, attachments, or injected A2UI configuration.
+    # Do not expose frontend tools, arbitrary UI state, or injected A2UI configuration.
+    # Reasoning is displayed by the client, but is not replayed as conversation input.
     trusted_run = run.model_copy(
         update={
+            "messages": [m for m in run.messages if m.role in {"user", "assistant", "tool"}],
             "tools": [],
             "context": [],
             "state": {},
@@ -99,32 +101,39 @@ async def _agui_events(
         }
     )
     started = False
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    stream = adapter.run(trusted_run)
     try:
-        async with asyncio.timeout(timeout_seconds):
-            async for event in adapter.run(trusted_run):
-                if event.type == EventType.RUN_STARTED:
-                    started = True
-                if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
-                    continue
-                if event.type == EventType.RUN_ERROR:
-                    logger.error("Agent run failed run_id=%s error=%s", run.run_id, event.message)
-                    yield RunErrorEvent(
-                        type=EventType.RUN_ERROR,
-                        code="AGENT_RUN_FAILED",
-                        message="実行に失敗しました。接続・設定・実行上限を確認してください。",
-                    )
-                    return
-                if event.type == EventType.RUN_FINISHED:
-                    yield CustomEvent(
-                        type=EventType.CUSTOM,
-                        name="run_metrics",
-                        value={
-                            "model_calls": hooks.model_calls,
-                            "tool_calls": hooks.tool_calls,
-                            "tool_errors": hooks.tool_errors,
-                        },
-                    )
-                yield event
+        while True:
+            # The endpoint runs each step in its own task, so asyncio.timeout() cannot span steps.
+            try:
+                event = await asyncio.wait_for(anext(stream), deadline - loop.time())
+            except StopAsyncIteration:
+                break
+            if event.type == EventType.RUN_STARTED:
+                started = True
+            if event.type in {EventType.RAW, EventType.REASONING_ENCRYPTED_VALUE}:
+                continue
+            if event.type == EventType.RUN_ERROR:
+                logger.error("Agent run failed run_id=%s error=%s", run.run_id, event.message)
+                yield RunErrorEvent(
+                    type=EventType.RUN_ERROR,
+                    code="AGENT_RUN_FAILED",
+                    message="実行に失敗しました。接続・設定・実行上限を確認してください。",
+                )
+                return
+            if event.type == EventType.RUN_FINISHED:
+                yield CustomEvent(
+                    type=EventType.CUSTOM,
+                    name="run_metrics",
+                    value={
+                        "model_calls": hooks.model_calls,
+                        "tool_calls": hooks.tool_calls,
+                        "tool_errors": hooks.tool_errors,
+                    },
+                )
+            yield event
     except Exception:
         logger.exception("Agent run failed run_id=%s", run.run_id)
         if not started:
@@ -138,3 +147,5 @@ async def _agui_events(
             code="AGENT_RUN_FAILED",
             message="実行に失敗しました。接続・設定・実行上限を確認してください。",
         )
+    finally:
+        await stream.aclose()

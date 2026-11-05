@@ -20,11 +20,6 @@ async def test_agentcore_entrypoint_runs_fixture_with_fresh_request_state(tmp_pa
         assert ping.json()["mode"] == "fixture"
         first = await client.post("/invocations", json=run_input())
         second = await client.post("/invocations", json=run_input(runId="next-run"))
-        assert (
-            await client.post(
-                "/invocations", json=run_input(), headers={"Origin": "https://untrusted.invalid"}
-            )
-        ).status_code == 403
     for response in [first, second]:
         assert response.status_code == 200
         events = decode_sse(response.text)

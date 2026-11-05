@@ -11,7 +11,7 @@
 - `terraform/`：AgentCore Runtime V2・ECR・IAMと、Web Adapter＋Next.jsを動かすLambda・API GatewayのIaC。
 - Terraformには有効・無効を切り替える条件分岐を新たに足さない。新しいリソースは常に作成し、値は変数の既定値で与える。`terraform test` のテストは書かない。
 - Next.jsのLambda用ZIPは `app/Dockerfile.lambda` でLinux ARM64向けにビルドする。AWSへの配備とローカルビルドを混同しない。
-- 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使う。
+- 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使い、HTTPエンドポイントは標準の `add_strands_fastapi_endpoint` に任せる。
 - MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。通常のPythonツールはecho_textのサンプルと、キー設定時のみ登録するTavilyのweb_search・web_fetch。データ探索のツールをPython側へ増やさない。
 - MCP Appsは右ペインのsandboxで描画する。ADKは実装範囲に含めない。クラウドのsandbox配備や構成の重要な変更は相談する。
 - クラウドのsandboxは専用API Gatewayの `GET /poc/sandbox` を既存Next.js Lambdaへ接続する。同じ送信元IP制限と別オリジンを維持し、URLはTerraformから実行時環境変数へ渡す。HTML・中継処理はローカルproxyと共用し、起動・ビルドスクリプトを増やさない。
