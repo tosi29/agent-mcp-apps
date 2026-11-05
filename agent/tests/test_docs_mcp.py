@@ -11,7 +11,6 @@ from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_clients import docs as docs_mcp
 from exploration_agent.mcp_clients.docs import (
     DOCS_SERVERS,
-    MAX_DOCS_CALLS_PER_RUN,
     MAX_RESULT_CHARS,
     TOOL_TIMEOUT,
     TRUNCATED_NOTICE,
@@ -32,7 +31,7 @@ def agent_args(clients):
 
 
 def before(name, tool=None):
-    return SimpleNamespace(tool_use={"name": name}, cancel_tool=False, selected_tool=tool)
+    return SimpleNamespace(tool_use={"name": name}, selected_tool=tool)
 
 
 def test_endpoints_and_tools_are_fixed():
@@ -105,24 +104,18 @@ async def test_agui_run_finishes_with_docs_clients_through_the_adapter(monkeypat
     assert not clients[0]._is_session_active()
 
 
-def test_call_budget_is_shared_across_servers_and_ignores_other_tools():
+def test_timeout_is_set_on_docs_tools_only():
     hook = DocsMCPHook()
-    names = ["aws___search_documentation", "microsoft_docs_search"]
-    for index in range(MAX_DOCS_CALLS_PER_RUN):
+    for name in ["aws___search_documentation", "microsoft_docs_search"]:
         tool = SimpleNamespace(timeout=None)
-        event = before(names[index % 2], tool)
-        hook.before_tool(event)
-        assert event.cancel_tool is False
+        hook.before_tool(before(name, tool))
         assert tool.timeout == TOOL_TIMEOUT
-    over = before(names[0])
-    hook.before_tool(over)
-    assert isinstance(over.cancel_tool, str)
-    other = before("search_transactions")
-    hook.before_tool(other)
-    assert other.cancel_tool is False
+    other = SimpleNamespace(timeout=None)
+    hook.before_tool(before("search_transactions", other))
+    assert other.timeout is None
 
 
-def test_result_is_bounded_marked_untrusted_and_text_only():
+def test_result_is_bounded_and_text_only():
     result = {
         "status": "success",
         "toolUseId": "1",

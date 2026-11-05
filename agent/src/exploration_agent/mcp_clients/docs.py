@@ -41,7 +41,6 @@ DOCS_SERVERS = (
     ),
 )
 DOCS_TOOL_NAMES = frozenset(name for server in DOCS_SERVERS for name in server.tools)
-MAX_DOCS_CALLS_PER_RUN = 5
 MAX_RESULT_CHARS = 8000
 TOOL_TIMEOUT = timedelta(seconds=20)
 TRUNCATED_NOTICE = "（上限に達したため以降を省略しました）"
@@ -73,10 +72,7 @@ def build_docs_clients() -> list[MCPClient]:
 
 
 class DocsMCPHook(HookProvider):
-    """Per-run call budget, and bounded text-only results."""
-
-    def __init__(self) -> None:
-        self.calls = 0
+    """Per-call timeout, and bounded text-only results."""
 
     def register_hooks(self, registry: HookRegistry, **kwargs: Any) -> None:
         registry.add_callback(BeforeToolCallEvent, self.before_tool)
@@ -85,10 +81,6 @@ class DocsMCPHook(HookProvider):
     def before_tool(self, event: BeforeToolCallEvent) -> None:
         if event.tool_use["name"] not in DOCS_TOOL_NAMES:
             return
-        if self.calls >= MAX_DOCS_CALLS_PER_RUN:
-            event.cancel_tool = "このrunのドキュメント参照回数の上限に達しました"
-            return
-        self.calls += 1
         if event.selected_tool is not None:
             # MCPClient has no option for this; MCPAgentTool reads it on each call.
             event.selected_tool.timeout = TOOL_TIMEOUT
