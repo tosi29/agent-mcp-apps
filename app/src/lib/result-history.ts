@@ -29,7 +29,6 @@ export type ResultRun = {
   status: "running" | "success" | "error" | "stopped";
   tools: { id: string; name: string; status: string }[];
   results: DataResult[];
-  metrics?: { model_calls: number; tool_calls: number };
 };
 
 // UI-only history. These previews must never be copied into agent messages or shared state.
@@ -67,8 +66,6 @@ export function resultHistorySubscriber(
           ...run, tools: run.tools.map(tool => tool.id === value.tool_call_id
             ? { ...tool, status: value.status } : tool),
         }));
-      } else if (event.name === "run_metrics") {
-        updateRun(input.runId, run => ({ ...run, metrics: event.value }));
       }
     },
     onRunFinishedEvent: ({ input, outcome }) => updateRun(input.runId, run => ({

@@ -45,8 +45,6 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
             "percent_change": 0,
         }
     ]
-    metrics = next(event["value"] for event in events if event.get("name") == "run_metrics")
-    assert metrics == {"model_calls": 4, "tool_calls": 3, "tool_errors": 0}
     statuses = [event["value"]["status"] for event in events if event.get("name") == "tool_status"]
     assert statuses == ["success"] * 3
 

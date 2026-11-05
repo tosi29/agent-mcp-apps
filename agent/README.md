@@ -67,7 +67,7 @@ Strands・OpenAIクライアントの自動再試行と、有料モデルへの�
 ```text
 src/exploration_agent/
 ├── agent.py             # プロンプトとツールの組み立て。全入口で共通のエージェント定義
-├── hooks.py             # 実行回数の集計とツールイベント
+├── hooks.py             # ツールの成否と画面用データの分離
 ├── agui.py              # 1回の実行のAG-UIイベント変換と失敗時の処理
 ├── model.py             # モデルの選択とさくらの設定
 ├── fixture_model.py     # 外部API不要の固定応答
@@ -126,7 +126,7 @@ AWS MCP Server等の実環境を操作するMCPは接続しない。
 ## 結果とイベント
 
 MCPの `content` はモデル用の要約と最大3行、`structuredContent` は画面用の最大20行を返す。
-`MCPPreviewHook` が表示用データを独立した `data_result` イベントへ変換し、
+`ToolResultHook` が表示用データを独立した `data_result` イベントへ変換し、
 `structuredContent` とMCPメタデータをモデルの会話状態へ入る前に取り除く。
 検索結果の全量（上限200行）はMCP側に一時保存する。エージェントは保存しない。
 MCP Appsツールでは結果の `_meta.preview` をUIへ送り、モデルの会話状態から取り除く。

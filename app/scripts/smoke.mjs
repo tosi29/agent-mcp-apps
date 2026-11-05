@@ -57,9 +57,9 @@ if (apps) {
   assert.ok(!JSON.stringify(agent.messages).includes("<html"));
   assert.ok(!JSON.stringify(agent.messages).includes("preview_rows"));
 }
-const metrics = custom.find(e => e.name === "run_metrics")?.value;
-assert.ok(metrics.model_calls >= 1);
-assert.equal(metrics.tool_errors, 0);
+const toolStatuses = custom.filter(e => e.name === "tool_status").map(e => e.value.status);
+assert.ok(toolStatuses.length >= 1);
+assert.ok(toolStatuses.every(status => status === "success"));
 const text = agent.messages.filter(m => m.role === "assistant").map(m => m.content ?? "").join("");
 assert.ok(text.includes("合成データ"));
 const timing = predicate => observations.find(item => predicate(item.event))?.elapsed_ms;
@@ -84,7 +84,7 @@ if (!live) {
     "A follow-up containing reasoning history must succeed");
 }
 const summary = {
-  mode: status.mode, metrics, events: events.length,
+  mode: status.mode, tool_statuses: toolStatuses, events: events.length,
   first_text_ms: timing(e => e.type === "TEXT_MESSAGE_CONTENT"),
   data_result_ms: timing(e => e.type === "CUSTOM" && e.name === "data_result"),
   done_ms: observations.at(-1).elapsed_ms,

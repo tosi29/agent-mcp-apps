@@ -28,9 +28,9 @@ async def test_agentcore_entrypoint_runs_fixture_with_fresh_request_state(tmp_pa
             e["type"] == "TOOL_CALL_START" and e["toolCallName"] == "echo_text" for e in events
         )
         assert not any(e.get("name") == "data_result" for e in events)
-        metrics = next(e["value"] for e in events if e.get("name") == "run_metrics")
-        assert metrics["model_calls"] == 2
-        assert metrics["tool_calls"] == 1
+        assert [e["value"]["status"] for e in events if e.get("name") == "tool_status"] == [
+            "success"
+        ]
     assert not results_dir.exists()
 
 

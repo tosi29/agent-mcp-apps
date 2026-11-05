@@ -128,7 +128,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
             label={toolNames[run.tools.find(tool => tool.id === result.tool_call_id)?.name ?? ""] ?? "検索・集計結果"} />)}
         {run.results.length === 0 && <p className="run-placeholder">{run.status === "running"
           ? "検索・集計結果を待っています…" : "この質問の検索・集計結果はありません。"}</p>}
-        {run.metrics && <div className="run-summary">ツール実行 {run.metrics.tool_calls}回</div>}
+        {run.status === "success" && <div className="run-summary">ツール実行 {run.tools.length}回</div>}
       </details>)}
       </div>
     </section>

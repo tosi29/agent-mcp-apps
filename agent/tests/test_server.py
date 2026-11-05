@@ -52,7 +52,6 @@ async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
     result = next(e["value"] for e in events if e.get("name") == "data_result")
     assert result["total_count"] == 3
     assert [row["transaction_count"] for row in result["preview_rows"]] == [40] * 3
-    assert next(e["value"] for e in events if e.get("name") == "run_metrics")["model_calls"] == 4
 
 
 async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):

@@ -158,7 +158,8 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     assert "tool_context" not in search_spec["parameters"]["properties"]
     assert all(request["stream"] is streaming for request in requests)
     assert events[-1]["type"] == "RUN_FINISHED", events
-    assert custom(events, "run_metrics") == [{"model_calls": 3, "tool_calls": 2, "tool_errors": 0}]
+    assert len(requests) == 3
+    assert [s["status"] for s in custom(events, "tool_status")] == ["success"] * 2
     data = custom(events, "data_result")[0]
     assert data["tool_call_id"] == "call-search"
     assert len(data["preview_rows"]) == 20
@@ -280,7 +281,6 @@ async def test_invalid_tool_input_reports_error_without_data(tmp_path, mcp_url):
         events = await collect(OpenAIModel(client=client, model_id="mock"), mcp_url=mcp_url)
     assert custom(events, "data_result") == []
     assert custom(events, "tool_status")[0]["status"] == "error"
-    assert custom(events, "run_metrics")[0]["tool_errors"] == 1
 
 
 async def test_ordinary_function_call_sample_works_without_mcp():
@@ -305,5 +305,5 @@ async def test_ordinary_function_call_sample_works_without_mcp():
     tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
     assert json.loads(tool_result["content"]) == {"text": "こんにちは"}
     assert events[-1]["type"] == "RUN_FINISHED"
-    assert custom(events, "run_metrics")[0]["tool_calls"] == 1
+    assert [s["name"] for s in custom(events, "tool_status")] == ["echo_text"]
     assert custom(events, "data_result") == []

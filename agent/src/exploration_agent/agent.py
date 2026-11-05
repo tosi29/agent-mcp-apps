@@ -58,13 +58,11 @@ def exploration_agent(
     *,
     mcp_url: str | None = None,
     mcp_runtime_arn: str | None = None,
-    hooks: list | None = None,
 ):
     return managed_agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=build_tools() + build_mcp_clients(mcp_url, mcp_runtime_arn) + build_docs_clients(),
-        hooks=hooks,
         callback_handler=log_callback,
         retry_strategy=None,
     )

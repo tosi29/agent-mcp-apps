@@ -28,7 +28,6 @@ test("two runs keep both results and never resend UI previews to the model", asy
         { type: "TOOL_CALL_RESULT", messageId: `message-${input.runId}`, toolCallId, content: '{"count":1}' },
         { type: "CUSTOM", name: "data_result", value: { ...result(`preview-only-${outgoing.length}`), tool_call_id: toolCallId } },
         { type: "CUSTOM", name: "tool_status", value: { tool_call_id: toolCallId, status: "success" } },
-        { type: "CUSTOM", name: "run_metrics", value: { model_calls: 2, tool_calls: 1 } },
         { type: "RUN_FINISHED", threadId: input.threadId, runId: input.runId },
       ];
       return new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""), {

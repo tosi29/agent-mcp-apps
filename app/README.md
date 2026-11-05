@@ -179,9 +179,8 @@ AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用す
 
 | name | 用途 |
 | --- | --- |
-| `data_result` | request_id / result_id / tool_call_id、件数、最大20行のプレビュー |
+| `data_result` | result_id / tool_call_id、件数、最大20行のプレビュー |
 | `tool_status` | ツール実行の成功・失敗 |
-| `run_metrics` | モデル・ツールの呼び出し回数、ツールエラー数 |
 
 `TOOL_CALL_END` は引数生成の終端で、実行完了は `tool_status` で扱う。
 プレビューはrun IDごとにReactの画面状態へ保持し、共有stateや会話メッセージへ追加しない。
