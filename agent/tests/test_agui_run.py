@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 from strands.models.openai import OpenAIModel
 
 from exploration_agent.agui import agui_events
-from exploration_agent.model import SakuraSettings
+from exploration_agent.model import sakura_factory_from_env
 
 
 def completion(message, finish_reason):
@@ -207,14 +207,14 @@ def test_sakura_settings_require_key_and_model(monkeypatch):
     monkeypatch.delenv("SAKURA_API_KEY", raising=False)
     monkeypatch.delenv("SAKURA_MODEL_ID", raising=False)
     with pytest.raises(ValueError, match="SAKURA_API_KEY"):
-        SakuraSettings.from_env()
+        sakura_factory_from_env()
     monkeypatch.setenv("SAKURA_API_KEY", "test-key")
     with pytest.raises(ValueError, match="SAKURA_MODEL_ID"):
-        SakuraSettings.from_env()
+        sakura_factory_from_env()
     monkeypatch.setenv("SAKURA_MODEL_ID", "test-model")
-    settings = SakuraSettings.from_env()
-    assert settings.api_key == "test-key"
-    assert settings.model_id == "test-model"
+    model = sakura_factory_from_env()()
+    assert model.client_args["api_key"] == "test-key"
+    assert model.get_config()["model_id"] == "test-model"
 
 
 async def test_text_arrives_before_http_stream_finishes(tmp_path):

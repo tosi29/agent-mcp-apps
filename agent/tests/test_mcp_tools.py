@@ -25,7 +25,7 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
         event.model_dump(mode="json", by_alias=True)
         async for event in agui_events(
             RunAgentInput.model_validate(run_input()),
-            lambda: FixtureModel(compare=True),
+            FixtureModel,
             mcp_url=mcp_url,
         )
     ]

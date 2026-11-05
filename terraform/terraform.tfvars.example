@@ -5,9 +5,9 @@
 # ブラウザを使う端末のグローバルIP（例示用アドレス。自分の値に置き換える）。
 # allowed_source_cidrs = ["203.0.113.10/32"]
 
-# さくらを使う場合のみ指定。SecureStringの作成・値の登録はTerraformの外で行う。
+# さくらのSecureStringの作成・値の登録はTerraformの外で行う。既定と異なる値を使う場合のみ指定する。
 # sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
-# sakura_model_id = "利用するモデルID"
+# sakura_model_id = "preview/Kimi-K2.7-Code"
 
 # TavilyのSecureStringの作成・値の登録はTerraformの外で行う。既定と異なる名前を使う場合のみ指定する。
 # tavily_api_key_parameter_name = "/agent-mcp-apps/tavily-api-key"

@@ -11,7 +11,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from strands.models.model import Model
 
 from exploration_agent.agui import agui_events
-from exploration_agent.model import build_model_factory
+from exploration_agent.fixture_model import FixtureModel
+from exploration_agent.model import sakura_factory_from_env
 from exploration_agent.observability import configure_observability
 
 
@@ -65,7 +66,7 @@ def main() -> None:
     args = parser.parse_args()
     uvicorn.run(
         create_app(
-            build_model_factory(args.model, compare=bool(args.mcp_url or args.mcp_runtime_arn)),
+            FixtureModel if args.model == "fixture" else sakura_factory_from_env(),
             mode=args.model,
             mcp_url=args.mcp_url,
             mcp_runtime_arn=args.mcp_runtime_arn,

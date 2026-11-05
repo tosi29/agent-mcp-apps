@@ -1,4 +1,5 @@
 import httpx
+import pytest
 from test_server import decode_sse, run_input
 
 from exploration_agent.entrypoints import agentcore as agentcore_server
@@ -7,7 +8,14 @@ from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
 
 
-async def test_agentcore_entrypoint_runs_fixture_with_fresh_request_state(tmp_path, monkeypatch):
+@pytest.fixture(autouse=True)
+def no_sakura_api(monkeypatch):
+    monkeypatch.setattr(
+        agentcore_server, "sakura_factory_from_parameter_store", lambda: FixtureModel
+    )
+
+
+async def test_agentcore_entrypoint_runs_with_fresh_request_state(tmp_path, monkeypatch):
     results_dir = tmp_path / "results"
     monkeypatch.chdir(tmp_path)
     app = create_agentcore_app()
@@ -17,7 +25,7 @@ async def test_agentcore_entrypoint_runs_fixture_with_fresh_request_state(tmp_pa
     ) as client:
         ping = await client.get("/ping")
         assert ping.status_code == 200
-        assert ping.json()["mode"] == "fixture"
+        assert ping.json()["mode"] == "sakura"
         first = await client.post("/invocations", json=run_input())
         second = await client.post("/invocations", json=run_input(runId="next-run"))
     for response in [first, second]:
@@ -47,17 +55,15 @@ async def test_local_entrypoint_still_rejects_remote_hosts(tmp_path):
         assert (await client.get("/ping")).status_code == 400
 
 
-def test_agentcore_mcp_configuration_is_lazy_and_fixture_enables_comparison(tmp_path, monkeypatch):
+def test_agentcore_mcp_configuration_is_lazy(tmp_path, monkeypatch):
     arn = "arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/comparison-AbCdEf1234"
     monkeypatch.setenv("MCP_RUNTIME_ARN", arn)
     captured = {}
 
-    def capture(factory, *_args, **kwargs):
+    def capture(_factory, *_args, **kwargs):
         captured.update(kwargs)
-        captured["model"] = factory()
         return "app"
 
     monkeypatch.setattr(agentcore_server, "create_app", capture)
     assert create_agentcore_app() == "app"
     assert captured["mcp_runtime_arn"] == arn
-    assert captured["model"].compare is True

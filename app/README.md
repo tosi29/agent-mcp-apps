@@ -69,8 +69,7 @@ npm run start
 
 AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN` を設定する。`AGENT_URL` より優先する。
 東京リージョンのRuntimeに接続し、AWS認証は標準チェーンを使う。Lambdaでは実行ロールから取得する。
-`InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。接続モードはRuntimeの `EXPLORER_MODEL_MODE` から取得する。
-モードが未設定なら `unknown` とし、fixtureとみなさない。
+`InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。AgentCore接続時の接続モードは常に `sakura` とする。
 
 ## MCP Appsの表示
 

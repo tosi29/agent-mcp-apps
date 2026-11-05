@@ -21,25 +21,20 @@ variable "agent_image_digest" {
 }
 
 variable "sakura_api_key_parameter_name" {
-  description = "事前作成したさくらAPIキーのSecureStringパラメータ名。値はTerraformで取得・管理しない。未指定ならfixture。"
+  description = "事前作成したさくらAPIキーのSecureStringパラメータ名。値はTerraformで取得・管理しない。"
   type        = string
   default     = "/agent-mcp-apps/sakura-api-key"
 
   validation {
-    condition     = var.sakura_api_key_parameter_name == null ? true : can(regex("^/?[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", var.sakura_api_key_parameter_name))
+    condition     = can(regex("^/?[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$", var.sakura_api_key_parameter_name))
     error_message = "SSMパラメータ名を指定してください。ARN、ワイルドカード、空文字は使えません。"
   }
 }
 
 variable "sakura_model_id" {
-  description = "さくらAI Engineで使用するモデルID。APIキーのパラメータ名と併せて指定する。"
+  description = "さくらAI Engineで使用するモデルID。"
   type        = string
-  default     = null
-
-  validation {
-    condition     = var.sakura_model_id == null ? true : length(trimspace(var.sakura_model_id)) > 0 && var.sakura_model_id == trimspace(var.sakura_model_id)
-    error_message = "sakura_model_idには空白を含まない有効なモデルIDを指定してください。"
-  }
+  default     = "preview/Kimi-K2.7-Code"
 }
 
 variable "tavily_api_key_parameter_name" {

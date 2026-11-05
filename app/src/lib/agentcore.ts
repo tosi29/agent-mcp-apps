@@ -24,10 +24,7 @@ export async function runtimeStatus() {
   const response = await control.send(new GetAgentRuntimeCommand({
     agentRuntimeId: arn.slice(arn.lastIndexOf("/") + 1),
   }), { abortSignal: AbortSignal.timeout(5_000) });
-  const configuredMode = response.environmentVariables?.EXPLORER_MODEL_MODE;
-  // Unknown configuration must not let the fixture smoke command trigger live inference.
-  const mode = configuredMode === "fixture" || configuredMode === "sakura" ? configuredMode : "unknown";
-  return { connected: response.status === "READY", mode };
+  return { connected: response.status === "READY", mode: "sakura" };
 }
 
 

@@ -106,7 +106,7 @@ ECRスクリプトはダイジェストのJSONを更新する。配備は別途p
 URLはTerraformがLambdaへ自動設定する。配備は [TerraformのREADME](terraform/README.md#mcp-appsのsandbox配備) を参照。
 
 対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
-モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、既定はfixture、SSM参照を設定するとさくらを使用する。
+モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、SSMのキーでさくらを使用する。fixtureはローカル専用。
 結果はMCP側に最大200行を一時保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
 - [app：画面、AG-UI接続、HTTP疎通テスト](app/README.md)

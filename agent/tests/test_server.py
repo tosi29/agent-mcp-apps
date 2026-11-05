@@ -36,7 +36,7 @@ def decode_sse(body):
 
 
 async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
-    app = create_app(lambda: FixtureModel(compare=True), mode="fixture", mcp_url=mcp_url)
+    app = create_app(FixtureModel, mode="fixture", mcp_url=mcp_url)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:

@@ -2,11 +2,10 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  agent_name     = "agent_mcp_apps_poc"
-  account_id     = data.aws_caller_identity.current.account_id
-  partition      = data.aws_partition.current.partition
-  logs_arn       = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/${local.agent_name}-*"
-  sakura_enabled = var.sakura_api_key_parameter_name != null
+  agent_name = "agent_mcp_apps_poc"
+  account_id = data.aws_caller_identity.current.account_id
+  partition  = data.aws_partition.current.partition
+  logs_arn   = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/${local.agent_name}-*"
   runtime_observability = {
     AGENT_OBSERVABILITY_ENABLED                        = "true"
     OTEL_PYTHON_DISTRO                                 = "aws_distro"
@@ -106,16 +105,13 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
   environment_variables = merge(
     local.runtime_observability,
     {
-      EXPLORER_MODEL_MODE = local.sakura_enabled ? "sakura" : "fixture"
-      OTEL_SERVICE_NAME   = local.agent_name
+      OTEL_SERVICE_NAME = local.agent_name
 
+      SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
+      SAKURA_MODEL_ID               = var.sakura_model_id
       TAVILY_API_KEY_PARAMETER_NAME = var.tavily_api_key_parameter_name
       DOCS_MCP_ENABLED              = "true"
     },
-    local.sakura_enabled ? {
-      SAKURA_API_KEY_PARAMETER_NAME = var.sakura_api_key_parameter_name
-      SAKURA_MODEL_ID               = var.sakura_model_id == null ? "" : var.sakura_model_id
-    } : {},
     var.mcp_image_digest != null ? {
       MCP_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.mcp[0].agent_runtime_arn
     } : {}
@@ -137,10 +133,6 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
 
   lifecycle {
     prevent_destroy = true
-    precondition {
-      condition     = local.sakura_enabled == (var.sakura_model_id != null)
-      error_message = "さくら接続はsakura_api_key_parameter_nameとsakura_model_idを両方指定してください。"
-    }
   }
 
   depends_on = [aws_iam_role_policy.agent, aws_iam_role_policy.sakura_parameter, aws_iam_role_policy.tavily_parameter, aws_iam_role_policy.agent_mcp]
@@ -159,9 +151,12 @@ resource "aws_iam_role_policy" "tavily_parameter" {
   })
 }
 
-resource "aws_iam_role_policy" "sakura_parameter" {
-  count = local.sakura_enabled ? 1 : 0
+moved {
+  from = aws_iam_role_policy.sakura_parameter[0]
+  to   = aws_iam_role_policy.sakura_parameter
+}
 
+resource "aws_iam_role_policy" "sakura_parameter" {
   name = "read_sakura_api_key_parameter"
   role = aws_iam_role.agent.id
   policy = jsonencode({

@@ -69,7 +69,7 @@ src/exploration_agent/
 ├── agent.py             # プロンプトとツールの組み立て。全入口で共通のエージェント定義
 ├── hooks.py             # ツールの成否と画面用データの分離
 ├── agui.py              # 1回の実行のAG-UIイベント変換と失敗時の処理
-├── model.py             # モデルの選択とさくらの設定
+├── model.py             # さくらのモデル設定
 ├── fixture_model.py     # 外部API不要の固定応答
 ├── secure_parameter.py  # Parameter Storeの遅延読み込み
 ├── observability.py     # ログ・トレース・メトリクス
@@ -143,8 +143,7 @@ RAWと暗号化推論値は送信しない。推論の返却有無はモデル�
 ## AgentCoreへの配備
 
 `Dockerfile` はエージェント用ARM64イメージを作る。ParquetとDuckDBは含めない。
-既定はfixtureで、さくら接続時は `EXPLORER_MODEL_MODE=sakura`、
-`SAKURA_API_KEY_PARAMETER_NAME`、`SAKURA_MODEL_ID` を設定する。
+AgentCoreでは常にさくらを使い、`SAKURA_API_KEY_PARAMETER_NAME` と `SAKURA_MODEL_ID` が必須。未設定なら起動時に停止する。
 SSM SecureStringの値は初回のrunで取得してメモリに保持し、起動時スナップショットへ含めない。変更は再起動で反映する。
 Web検索のキーは `TAVILY_API_KEY_PARAMETER_NAME` で指定する。Terraform配備では常に設定される。
 

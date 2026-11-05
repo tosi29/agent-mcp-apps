@@ -12,7 +12,7 @@ Browser → API Gateway Regional REST API /poc/（送信元IP制限）
 
 Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
 AWS認証は標準の認証情報チェーンを使用し、account ID変数は設けない。
-AgentCoreは既定でfixture。Parameter Storeのキー参照とモデルIDを指定した場合にさくらAPIを使用する。
+AgentCoreは常にParameter StoreのキーでさくらAPIを使用する。fixtureはローカル専用。
 Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
 
 既存の中継LambdaはNext.jsを起動するLambdaへ更新する。`moved` ブロックでTerraform上のアドレスを移し、
@@ -154,20 +154,19 @@ API Gateway・Lambda・AgentCoreの利用料金が発生し得る。
 カスタマー管理KMSキーを使う場合は、対象キーへの復号権限を別途設計する。
 パラメータ本体・値の登録はTerraformの管理対象にせず、値をstateへ取り込むデータソースも設けない。
 
-`terraform.tfvars` には名前とモデルIDを設定する。
+名前とモデルIDの既定値は次のとおり。異なる値を使う場合は `terraform.tfvars` で指定する。
 
 ```hcl
 sakura_api_key_parameter_name = "/agent-mcp-apps/sakura-api-key"
 sakura_model_id               = "preview/Kimi-K2.7-Code"
 ```
 
-モデルIDは設定例。使用するAPIキーの契約・モデルの利用可否・無償枠の残りを利用者が確認する。
-名前とモデルIDを両方省略すればfixture、両方指定すればさくらとなる。
+使用するAPIキーの契約・モデルの利用可否・無償枠の残りを利用者が確認する。
+パラメータの事前作成は必須で、未作成だと初回のrunが失敗する。
 AgentCoreの実行ロールには、そのパラメータ1つの `ssm:GetParameter` だけを付与する。
 起動・ページ表示ではキーを取得せず、AgentCoreが初回のrunで復号取得してメモリに保持する。キーの変更はRuntimeの再起動で反映する。Next.jsはキーを受け取らない。
 
-SSM対応の新しいエージェントイメージを `node scripts/push-images.mjs agent` でpushしてから切り替える。
-旧fixture専用イメージのまま設定だけを変更しない。Next.jsの接続モード表示も更新するため、Web用ZIPも再ビルド・配備する。
+エージェントイメージとWeb用ZIPは、このTerraform構成と併せて更新する。
 push・apply・実API検証は実行前に確認する。SSMの実権限とさくらの応答は、デプロイ後の検証が必要。
 
 ## TavilyのAPIキーを指定する
