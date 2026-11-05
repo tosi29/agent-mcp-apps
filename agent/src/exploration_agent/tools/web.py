@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
 from typing import Any
 
 import httpx2
@@ -18,8 +17,6 @@ TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 TAVILY_EXTRACT_URL = "https://api.tavily.com/extract"
 MAX_QUERY_CHARS = 400
 MAX_RESULTS = 5
-MAX_SEARCHES_PER_RUN = 3
-MAX_FETCHES_PER_RUN = 3
 MAX_TITLE_CHARS = 200
 MAX_URL_CHARS = 500
 MAX_CONTENT_CHARS = 500
@@ -88,14 +85,11 @@ def _post_tavily(
 
 
 def build_web_tools(*, transport: httpx2.BaseTransport | None = None) -> list:
-    """Create the tools per run, so budgets cannot carry over between requests."""
     return [build_web_search_tool(transport=transport), build_web_fetch_tool(transport=transport)]
 
 
 def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
     """Any http(s) URL is accepted. Tavily does the fetching, so the agent never connects to it."""
-    lock = threading.Lock()
-    fetches = 0
 
     @tool
     def web_fetch(url: str) -> dict[str, Any]:
@@ -104,13 +98,8 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
         Args:
             url: http(s)のURL。取引データの値や利用者の個人情報を含めない。
         """
-        nonlocal fetches
         if not _is_web_url(url):
             raise ValueError("urlは500文字以内のhttp(s)のURLにしてください")
-        with lock:
-            if fetches >= MAX_FETCHES_PER_RUN:
-                raise ValueError("このrunのWebページ取得回数の上限に達しました")
-            fetches += 1
         try:
             items = _post_tavily(
                 TAVILY_EXTRACT_URL,
@@ -141,10 +130,6 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
 
 
 def build_web_search_tool(*, transport: httpx2.BaseTransport | None = None):
-    """Create a tool per run, so the paid-call budget cannot carry over between requests."""
-    lock = threading.Lock()
-    searches = 0
-
     @tool
     def web_search(query: str) -> dict[str, Any]:
         """外部Webを検索し、タイトル・URL・短い抜粋を返す。取引データの検索・集計には使わない。
@@ -152,13 +137,8 @@ def build_web_search_tool(*, transport: httpx2.BaseTransport | None = None):
         Args:
             query: 400文字以内の検索語。取引データの値や利用者の個人情報を含めない。
         """
-        nonlocal searches
         if not isinstance(query, str) or not query.strip() or len(query) > MAX_QUERY_CHARS:
             raise ValueError("queryは1〜400文字の文字列にしてください")
-        with lock:
-            if searches >= MAX_SEARCHES_PER_RUN:
-                raise ValueError("このrunのWeb検索回数の上限に達しました")
-            searches += 1
         try:
             items = _post_tavily(
                 TAVILY_SEARCH_URL,

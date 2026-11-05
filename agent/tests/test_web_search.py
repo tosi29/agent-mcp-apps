@@ -17,10 +17,8 @@ from exploration_agent.entrypoints.server import create_app
 from exploration_agent.tools import web as web_search
 from exploration_agent.tools.web import (
     MAX_CONTENT_CHARS,
-    MAX_FETCHES_PER_RUN,
     MAX_PAGE_CHARS,
     MAX_RESULTS,
-    MAX_SEARCHES_PER_RUN,
     MAX_URL_CHARS,
     build_web_fetch_tool,
     build_web_search_tool,
@@ -100,23 +98,6 @@ def test_invalid_query_is_rejected_without_calling_tavily(query):
 
     with pytest.raises(ValueError, match="query"):
         build_web_search_tool(transport=tavily(handle))(query=query)
-
-
-def test_budget_applies_per_run_and_does_not_carry_over():
-    calls = []
-
-    def handle(request):
-        calls.append(request)
-        return httpx2.Response(200, json={"results": []})
-
-    first_run = build_web_search_tool(transport=tavily(handle))
-    for _ in range(MAX_SEARCHES_PER_RUN):
-        first_run(query="q")
-    with pytest.raises(ValueError, match="上限"):
-        first_run(query="q")
-    assert len(calls) == MAX_SEARCHES_PER_RUN
-    build_web_search_tool(transport=tavily(handle))(query="q")
-    assert len(calls) == MAX_SEARCHES_PER_RUN + 1
 
 
 @pytest.mark.parametrize(
@@ -228,16 +209,6 @@ def test_fetch_rejects_non_web_urls_without_calling_tavily(url):
 
     with pytest.raises(ValueError, match="url"):
         build_web_fetch_tool(transport=tavily(handle))(url=url)
-
-
-def test_fetch_budget_applies_per_run_and_does_not_carry_over():
-    page = {"results": [{"url": PAGE_URL, "raw_content": "本文"}]}
-    fetch = build_web_fetch_tool(transport=tavily_site(page))
-    for _ in range(MAX_FETCHES_PER_RUN):
-        fetch(url=PAGE_URL)
-    with pytest.raises(ValueError, match="上限"):
-        fetch(url=PAGE_URL)
-    assert build_web_fetch_tool(transport=tavily_site(page))(url=PAGE_URL)["content"] == "本文"
 
 
 @pytest.mark.parametrize(
