@@ -51,6 +51,7 @@
 ## 依存関係と仕様の確認
 
 - Pythonは `agent/pyproject.toml` と `agent/uv.lock`、フロントは `app/package.json` と `app/package-lock.json` を併せて管理する。
+- ワークフローのアクションを追加・更新したら `gh actions-lock` を実行し、`.github/workflows/actions.lock` を併せてコミットする。lockfileは手で編集しない。
 - 最新版という理由だけで依存を個別に更新しない。CopilotKitとAG-UIクライアントの組み合わせ等、互換性を確認する。
 - SDKやクラウド機能のAPI名・対応範囲は、採用バージョンの公式仕様・型定義・実コードで確認する。
 - 採用バージョンはmanifestとlockファイルを参照する。このファイルへ重複して固定しない。
