@@ -1,6 +1,7 @@
 version: 2
 
-# npmとuvのバージョン更新を1つのPRにまとめる。
+# npm・uv・GitHub Actionsのバージョン更新を1つのPRにまとめる。
+# Actionsの更新では、同じPRで .github/workflows/actions.lock も更新される。
 # セキュリティ更新は、このグループとは別にPRが作られる場合がある。
 multi-ecosystem-groups:
   dependencies:
@@ -28,5 +29,10 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/mcp/ui"
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
     patterns: ["*"]
     multi-ecosystem-group: "dependencies"
