@@ -21,6 +21,11 @@ updates:
     patterns: ["*"]
     multi-ecosystem-group: "dependencies"
 
+  - package-ecosystem: "uv"
+    directory: "/mcp"
+    patterns: ["*"]
+    multi-ecosystem-group: "dependencies"
+
   - package-ecosystem: "npm"
     directory: "/mcp/ui"
     patterns: ["*"]
