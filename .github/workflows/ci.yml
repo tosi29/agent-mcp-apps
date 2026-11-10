@@ -1,0 +1,85 @@
+name: CI
+
+# AGENTS.mdの「検証と報告」と同じ、外部API・クラウド不要の検証だけを実行する。
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: mcp・agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: mcp/ui/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5" # agent/Dockerfile・mcp/Dockerfileと揃える
+      # MCPサーバーは生成済みのMCP App HTMLがないと起動しない。
+      - name: MCP AppのHTMLをビルド・テスト
+        run: |
+          npm --prefix mcp/ui ci --ignore-scripts --no-audit --no-fund
+          npm --prefix mcp/ui run build
+          npm --prefix mcp/ui test
+      - name: mcp
+        working-directory: mcp
+        run: |
+          uv run --locked ruff check src tests
+          uv run --locked ruff format --check src tests
+          uv run --locked pytest -q
+      # agentの統合テストは、上で作ったmcpの仮想環境からMCPサーバーを起動する。
+      - name: agent
+        working-directory: agent
+        run: |
+          uv run --locked ruff check src tests
+          uv run --locked ruff format --check src tests
+          uv run --locked pytest -q
+
+  app:
+    name: app・scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: app
+        working-directory: app
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
+      - name: scripts
+        run: node --test scripts/*.test.mjs
+
+  terraform:
+    name: terraform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.7" # terraform/versions.tfと揃える
+          terraform_wrapper: false
+      # AWSの認証情報とstateは使わない。plan・applyは実行しない。
+      - run: terraform -chdir=terraform fmt -check -recursive
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate

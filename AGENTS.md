@@ -81,6 +81,7 @@ npm run typecheck
 npm run build
 ```
 
+- 上記と各READMEの外部API不要の検証は、PRとmainへのpushで `.github/workflows/ci.yml` も実行する。コマンドを変える場合は両方を整合させる。
 - AG-UIの接続やイベントを変更した場合は、Pythonをfixtureモードで起動し、Next.js経由の `npm run smoke` も確認する。起動手順は `app/README.md` を参照する。
 - `npm run smoke -- --live` は実際の推論APIを呼ぶ。外部API不要のテストと混同しない。
 - 確認済み・未検証・仮定を分けて報告する。HTTP疎通、ブラウザ描画、モデルの回答品質、クラウド動作をそれぞれ区別する。
