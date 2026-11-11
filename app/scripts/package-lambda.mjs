@@ -1,9 +1,13 @@
-import { cp, mkdir, readdir, rm, chmod, utimes } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { chmod, cp, mkdir, readdir, rm, utimes } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-if (process.platform !== "linux" || process.arch !== "arm64" || !process.versions.node.startsWith("26.")) {
+if (
+  process.platform !== "linux" ||
+  process.arch !== "arm64" ||
+  !process.versions.node.startsWith("26.")
+) {
   throw new Error("Lambda ZIP must be built with Dockerfile.lambda on Linux ARM64 / Node.js 26");
 }
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -29,7 +33,9 @@ async function visit(directory) {
 await visit(staging);
 await rm(path.join(root, "dist/web.zip"), { force: true });
 const result = spawnSync("zip", ["-Xq", "../web.zip", "-@"], {
-  cwd: staging, input: files.sort().join("\n") + "\n", stdio: ["pipe", "inherit", "inherit"],
+  cwd: staging,
+  input: `${files.sort().join("\n")}\n`,
+  stdio: ["pipe", "inherit", "inherit"],
   env: { ...process.env, TZ: "UTC" },
 });
 if (result.error) throw result.error;

@@ -9,10 +9,18 @@ class Element {
   attributes = {};
   listeners = {};
   textContent = "";
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = nodes; }
-  setAttribute(key, value) { this.attributes[key] = value; }
-  addEventListener(type, handler) { this.listeners[type] = handler; }
+  append(...nodes) {
+    this.children.push(...nodes);
+  }
+  replaceChildren(...nodes) {
+    this.children = nodes;
+  }
+  setAttribute(key, value) {
+    this.attributes[key] = value;
+  }
+  addEventListener(type, handler) {
+    this.listeners[type] = handler;
+  }
 }
 
 test("dashboard renders tool data, changes the metric, treats labels as text and clears empty results", async () => {
@@ -20,24 +28,47 @@ test("dashboard renders tool data, changes the metric, treats labels as text and
   // the view's real rendering code can be exercised without a browser or network.
   const output = await build({
     entryPoints: [new URL("./src/dashboard.ts", import.meta.url).pathname],
-    bundle: true, write: false, format: "iife",
-    plugins: [{ name: "app-adapter", setup(builder) {
-      builder.onResolve({ filter: /^@modelcontextprotocol\/ext-apps$/ }, () => ({ path: "app", namespace: "test" }));
-      builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({ contents:
-        "export class App { constructor(){globalThis.app=this} async connect(){} }" }));
-    } }],
+    bundle: true,
+    write: false,
+    format: "iife",
+    plugins: [
+      {
+        name: "app-adapter",
+        setup(builder) {
+          builder.onResolve({ filter: /^@modelcontextprotocol\/ext-apps$/ }, () => ({
+            path: "app",
+            namespace: "test",
+          }));
+          builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({
+            contents: "export class App { constructor(){globalThis.app=this} async connect(){} }",
+          }));
+        },
+      },
+    ],
   });
-  const elements = Object.fromEntries(["chart", "rows", "metric", "subtitle", "status"].map(id => [id, new Element()]));
+  const elements = Object.fromEntries(
+    ["chart", "rows", "metric", "subtitle", "status"].map((id) => [id, new Element()]),
+  );
   elements.metric.value = "average_price_yen";
   elements.metric.selectedOptions = [{ textContent: "平均取引総額" }];
-  const context = { document: {
-    getElementById: id => elements[id], createElement: () => new Element(),
-  } };
+  const context = {
+    document: {
+      getElementById: (id) => elements[id],
+      createElement: () => new Element(),
+    },
+  };
   runInNewContext(output.outputFiles[0].text, context);
-  const data = { _meta: { preview: { group_by: "municipality", preview_rows: [
-    { municipality: "<img src=x>", transaction_count: 4, average_price_yen: 100 },
-    { municipality: "新宿区", transaction_count: 1, average_price_yen: 200 },
-  ] } } };
+  const data = {
+    _meta: {
+      preview: {
+        group_by: "municipality",
+        preview_rows: [
+          { municipality: "<img src=x>", transaction_count: 4, average_price_yen: 100 },
+          { municipality: "新宿区", transaction_count: 1, average_price_yen: 200 },
+        ],
+      },
+    },
+  };
   context.app.ontoolresult(data);
   assert.equal(elements.rows.children.length, 2);
   assert.equal(elements.rows.children[0].children[0].textContent, "<img src=x>");

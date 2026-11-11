@@ -1,10 +1,14 @@
-import { build } from "esbuild";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { Script } from "node:vm";
+import { build } from "esbuild";
 
 const result = await build({
   entryPoints: [new URL("./src/dashboard.ts", import.meta.url).pathname],
-  bundle: true, minify: true, write: false, format: "iife", target: "es2022",
+  bundle: true,
+  minify: true,
+  write: false,
+  format: "iife",
+  target: "es2022",
 });
 const template = await readFile(new URL("./src/dashboard.html", import.meta.url), "utf8");
 const script = result.outputFiles[0].text.replaceAll("</script", "<\\/script");

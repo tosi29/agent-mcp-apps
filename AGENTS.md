@@ -79,10 +79,12 @@ uv run --locked pytest -q
 フロントの変更は `app/` で実行する。
 
 ```sh
+npm run lint
 npm run typecheck
 npm run build
 ```
 
+- TypeScript・JavaScript・CSS・JSONの整形とlintはリポジトリ直下の `biome.json` を共用し、`app/` と `mcp/ui/` の `npm run lint` で検査する。整形は `npm run lint:fix` で適用する。ルートの `scripts/` は `app/node_modules/.bin/biome ci scripts` で検査する。
 - 上記と各READMEの外部API不要の検証は、PRとmainへのpushで `.github/workflows/ci.yml` も実行する。コマンドを変える場合は両方を整合させる。
 - AG-UIの接続やイベントを変更した場合は、Pythonをfixtureモードで起動し、Next.js経由の `npm run smoke` も確認する。起動手順は `app/README.md` を参照する。
 - `npm run smoke -- --live` は実際の推論APIを呼ぶ。外部API不要のテストと混同しない。

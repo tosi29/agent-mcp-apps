@@ -13,7 +13,8 @@ export async function backendStatus() {
     return runtimeStatus();
   }
   const response = await fetch(new URL("/ping", agentUrl()), {
-    cache: "no-store", signal: AbortSignal.timeout(3_000),
+    cache: "no-store",
+    signal: AbortSignal.timeout(3_000),
   });
   if (!response.ok) throw new Error("backend unavailable");
   const status = await response.json();
@@ -25,7 +26,10 @@ export function agentUrl(): URL {
   if (
     url.protocol !== "http:" ||
     !["127.0.0.1", "localhost"].includes(url.hostname) ||
-    url.username || url.password || url.search || url.hash
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
   ) {
     throw new Error("AGENT_URL must point to a local HTTP endpoint");
   }

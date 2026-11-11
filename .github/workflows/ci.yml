@@ -32,6 +32,7 @@ jobs:
       - name: MCP AppのHTMLをビルド・テスト
         run: |
           npm --prefix mcp/ui ci --ignore-scripts --no-audit --no-fund
+          npm --prefix mcp/ui run lint
           npm --prefix mcp/ui run build
           npm --prefix mcp/ui test
       - name: mcp
@@ -65,11 +66,15 @@ jobs:
         working-directory: app
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
+          npm run lint
           npm run typecheck
           npm test
           npm run build
+      # ルートのscripts/はpackage.jsonを持たないため、appのBiomeで検査する。
       - name: scripts
-        run: node --test scripts/*.test.mjs
+        run: |
+          app/node_modules/.bin/biome ci scripts
+          node --test scripts/*.test.mjs
 
   terraform:
     name: terraform

@@ -36,47 +36,71 @@ export function resultHistorySubscriber(
   update: (change: (history: ResultRun[]) => ResultRun[]) => void,
 ): AgentSubscriber {
   const updateRun = (runId: string, change: (run: ResultRun) => ResultRun) =>
-    update(history => history.map(run => run.runId === runId ? change(run) : run));
+    update((history) => history.map((run) => (run.runId === runId ? change(run) : run)));
 
   return {
     onRunStartedEvent: ({ event, input }) => {
-      const question = input.messages.findLast(message => message.role === "user")?.content;
-      update(history => history.some(run => run.runId === event.runId) ? history : [...history, {
-        runId: event.runId,
-        question: typeof question === "string" ? question : "データ探索",
-        status: "running", tools: [], results: [],
-      }]);
+      const question = input.messages.findLast((message) => message.role === "user")?.content;
+      update((history) =>
+        history.some((run) => run.runId === event.runId)
+          ? history
+          : [
+              ...history,
+              {
+                runId: event.runId,
+                question: typeof question === "string" ? question : "データ探索",
+                status: "running",
+                tools: [],
+                results: [],
+              },
+            ],
+      );
     },
-    onToolCallStartEvent: ({ event, input }) => updateRun(input.runId, run => ({
-      ...run, tools: [...run.tools.filter(tool => tool.id !== event.toolCallId), {
-        id: event.toolCallId, name: event.toolCallName, status: "running",
-      }],
-    })),
+    onToolCallStartEvent: ({ event, input }) =>
+      updateRun(input.runId, (run) => ({
+        ...run,
+        tools: [
+          ...run.tools.filter((tool) => tool.id !== event.toolCallId),
+          {
+            id: event.toolCallId,
+            name: event.toolCallName,
+            status: "running",
+          },
+        ],
+      })),
     onCustomEvent: ({ event, input }) => {
       if (event.name === "data_result") {
         const result = event.value as DataResult;
         if (typeof result?.result_id === "string" && Array.isArray(result.preview_rows)) {
-          updateRun(input.runId, run => ({
-            ...run, results: [...run.results.filter(item => item.result_id !== result.result_id), result],
+          updateRun(input.runId, (run) => ({
+            ...run,
+            results: [...run.results.filter((item) => item.result_id !== result.result_id), result],
           }));
         }
       } else if (event.name === "tool_status") {
         const value = event.value as { tool_call_id: string; status: string };
-        updateRun(input.runId, run => ({
-          ...run, tools: run.tools.map(tool => tool.id === value.tool_call_id
-            ? { ...tool, status: value.status } : tool),
+        updateRun(input.runId, (run) => ({
+          ...run,
+          tools: run.tools.map((tool) =>
+            tool.id === value.tool_call_id ? { ...tool, status: value.status } : tool,
+          ),
         }));
       }
     },
-    onRunFinishedEvent: ({ input, outcome }) => updateRun(input.runId, run => ({
-      ...run, status: outcome === "success" ? "success" : "stopped",
-    })),
-    onRunErrorEvent: ({ input }) => updateRun(input.runId, run => ({ ...run, status: "error" })),
-    onRunFailed: ({ input }) => updateRun(input.runId, run => ({ ...run, status: "error" })),
-    onRunFinalized: ({ input }) => updateRun(input.runId, run => ({
-      ...run,
-      status: run.status === "running" ? "stopped" : run.status,
-      tools: run.tools.map(tool => tool.status === "running" ? { ...tool, status: "stopped" } : tool),
-    })),
+    onRunFinishedEvent: ({ input, outcome }) =>
+      updateRun(input.runId, (run) => ({
+        ...run,
+        status: outcome === "success" ? "success" : "stopped",
+      })),
+    onRunErrorEvent: ({ input }) => updateRun(input.runId, (run) => ({ ...run, status: "error" })),
+    onRunFailed: ({ input }) => updateRun(input.runId, (run) => ({ ...run, status: "error" })),
+    onRunFinalized: ({ input }) =>
+      updateRun(input.runId, (run) => ({
+        ...run,
+        status: run.status === "running" ? "stopped" : run.status,
+        tools: run.tools.map((tool) =>
+          tool.status === "running" ? { ...tool, status: "stopped" } : tool,
+        ),
+      })),
   };
 }
