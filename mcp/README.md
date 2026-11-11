@@ -101,8 +101,9 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 ```
 
 さらに `app/` で `npm run dev` を実行し、<http://127.0.0.1:3000> を開く。
-fixtureは質問内容にかかわらず、既存の項目確認・年別集計と、MCPによる平均取引総額の比較を実行する。
-右側に既存の集計表とMCPの比較結果が別々に追加される。推論APIは呼ばない。
+fixtureは項目確認・新宿区の年別集計・平均取引総額の比較を行う固定シナリオを実行する。
+質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換える。
+右側に集計結果と比較結果が別々に追加される。推論APIは呼ばない。
 MCP接続先を指定しないエージェントはMCPに接続しない。
 
 さくらを使う場合は `--model fixture` を外し、`uv run --locked --env-file .env explore-server --mcp-url ...` で起動する。
