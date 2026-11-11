@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ToolResultHook(HookProvider):
     """Keep results per tool call for the client, and strip UI data from the model's copy."""
 
-    def __init__(self, app_loader: Callable[[], Awaitable[dict]]):
+    def __init__(self, app_loader: Callable[[], Coroutine[Any, Any, dict]]):
         self.app_loader = app_loader
         self.previews: dict[str, dict] = {}
         self.statuses: dict[str, dict] = {}
@@ -53,9 +53,9 @@ class ToolResultHook(HookProvider):
             "toolInput": event.tool_use.get("input", {}),
             "toolResult": {
                 "content": [
-                    {"type": "text", "text": block["text"]}
+                    {"type": "text", "text": text}
                     for block in event.result.get("content", [])
-                    if isinstance(block.get("text"), str)
+                    if isinstance(text := block.get("text"), str)
                 ],
                 "structuredContent": structured,
                 "_meta": {"preview": preview},

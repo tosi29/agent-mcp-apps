@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 
 def configure_observability() -> None:
     logging.disable(logging.NOTSET)
+    # The original process stderr is None only when Python starts without one.
+    stderr = sys.__stderr__ or sys.stderr
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        stream=sys.__stderr__,
+        stream=stderr,
     )
     logging.getLogger().setLevel(os.environ.get("LOG_LEVEL", "INFO"))
     # Preserve providers already configured by opentelemetry-instrument/ADOT or an earlier call.
@@ -32,20 +34,16 @@ def configure_observability() -> None:
     tracer = TracerProvider(resource=resource)
     # Keep background/shutdown exporters attached to the process stderr, rather than
     # a temporary capture stream that a test runner or embedding caller may close.
-    tracer.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=sys.__stderr__)))
+    tracer.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=stderr)))
     trace.set_tracer_provider(tracer)
     metrics.set_meter_provider(
         MeterProvider(
             resource=resource,
-            metric_readers=[
-                PeriodicExportingMetricReader(ConsoleMetricExporter(out=sys.__stderr__))
-            ],
+            metric_readers=[PeriodicExportingMetricReader(ConsoleMetricExporter(out=stderr))],
         )
     )
     logs = LoggerProvider(resource=resource)
-    logs.add_log_record_processor(
-        SimpleLogRecordProcessor(ConsoleLogRecordExporter(out=sys.__stderr__))
-    )
+    logs.add_log_record_processor(SimpleLogRecordProcessor(ConsoleLogRecordExporter(out=stderr)))
     _logs.set_logger_provider(logs)
     logging.getLogger().addHandler(LoggingHandler(logger_provider=logs))
 

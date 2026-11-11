@@ -214,8 +214,9 @@ def test_sakura_settings_require_key_and_model(monkeypatch):
         sakura_factory_from_env()
     monkeypatch.setenv("SAKURA_MODEL_ID", "test-model")
     model = sakura_factory_from_env()()
+    assert isinstance(model, OpenAIModel)
     assert model.client_args["api_key"] == "test-key"
-    assert model.get_config()["model_id"] == "test-model"
+    assert model.get_config().get("model_id") == "test-model"
 
 
 async def test_text_arrives_before_http_stream_finishes(tmp_path):

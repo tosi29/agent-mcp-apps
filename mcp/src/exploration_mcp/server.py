@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import uvicorn
 from mcp.server import MCPServer
@@ -44,7 +45,8 @@ def create_app(
     server = MCPServer(
         "exploration-tools",
         subscriptions=False,
-        log_level=os.environ.get("LOG_LEVEL", "INFO"),
+        # MCPServer validates the level at runtime; the environment value is only a str here.
+        log_level=cast(Any, os.environ.get("LOG_LEVEL", "INFO")),
         extensions=[dashboard_app(explorer, store)],
     )
     register_tools(server, explorer, store)

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from ag_ui.core import RunAgentInput
@@ -30,8 +31,12 @@ def agent_args(clients):
     return {"model": FixtureModel(), "tools": [echo_text, *clients], "callback_handler": None}
 
 
-def before(name, tool=None):
+def before(name, tool=None) -> Any:
     return SimpleNamespace(tool_use={"name": name}, selected_tool=tool)
+
+
+async def unused_app_loader() -> dict:
+    raise AssertionError("unexpected MCP App resource load")
 
 
 def test_endpoints_and_tools_are_fixed():
@@ -129,7 +134,7 @@ def test_result_is_bounded_and_text_only():
         "structuredContent": {"raw": "x"},
         "metadata": {"raw": "x"},
     }
-    event = SimpleNamespace(tool_use={"name": "microsoft_docs_fetch"}, result=result)
+    event: Any = SimpleNamespace(tool_use={"name": "microsoft_docs_fetch"}, result=result)
     DocsMCPHook().after_tool(event)
     # A single block: the AG-UI adapter forwards and replays only the last text block.
     body = "a" * (MAX_RESULT_CHARS - 2) + "\nb"
@@ -145,17 +150,18 @@ async def test_ui_fields_are_stripped_from_docs_results():
         "structuredContent": {"raw": "x"},
         "metadata": {"raw": "x"},
     }
-    event = SimpleNamespace(
+    event: Any = SimpleNamespace(
         tool_use={"name": "microsoft_docs_fetch", "toolUseId": "1"}, result=result
     )
-    await ToolResultHook(app_loader=None).after_tool(event)
+    # Docs results never load the MCP App resource.
+    await ToolResultHook(app_loader=unused_app_loader).after_tool(event)
     assert "structuredContent" not in result
     assert "metadata" not in result
 
 
 def test_other_tool_results_are_untouched():
     result = {"status": "success", "toolUseId": "1", "content": [{"text": "x"}], "metadata": {}}
-    event = SimpleNamespace(tool_use={"name": "search_transactions"}, result=result)
+    event: Any = SimpleNamespace(tool_use={"name": "search_transactions"}, result=result)
     DocsMCPHook().after_tool(event)
     assert result["content"] == [{"text": "x"}]
     assert result["metadata"] == {}

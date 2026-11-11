@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import Mapping
 from typing import Literal
 
 from mcp.server import MCPServer
@@ -13,7 +14,7 @@ from exploration_mcp.results import ResultStore, model_summary
 
 
 def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore) -> None:
-    def publish(result: dict, *, summary: dict | None = None) -> CallToolResult:
+    def publish(result: dict, *, summary: Mapping[str, object] | None = None) -> CallToolResult:
         preview = store.put({"source": "mcp", **result})
         return CallToolResult(
             content=[

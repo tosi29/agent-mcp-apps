@@ -2,11 +2,14 @@
 
 import asyncio
 import json
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
 from strands.models.model import Model
+from strands.types.content import ContentBlockStartToolUse
+from strands.types.streaming import StreamEvent
 
 REASONING_NOTICE = "これは推論表示の接続検証用サンプルです。実際のモデルの推論ではありません。"
 AGGREGATE_ARGS = {"municipality": "新宿区", "group_by": "year"}
@@ -75,7 +78,9 @@ class FixtureModel(Model):
         raise NotImplementedError("FixtureModel does not support structured output")
         yield  # pragma: no cover
 
-    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+    async def stream(
+        self, messages, tool_specs=None, system_prompt=None, **kwargs
+    ) -> AsyncGenerator[StreamEvent, None]:
         if self.scenario is None:
             self.scenario = choose_scenario(messages, tool_specs)
         call = self.calls
@@ -89,7 +94,10 @@ class FixtureModel(Model):
             yield {"contentBlockStop": {}}
         if call < len(self.scenario.tool_calls):
             name, args = self.scenario.tool_calls[call]
-            tool_use = {"name": name, "toolUseId": "fixture-" + uuid4().hex}
+            tool_use: ContentBlockStartToolUse = {
+                "name": name,
+                "toolUseId": "fixture-" + uuid4().hex,
+            }
             yield {"contentBlockStart": {"start": {"toolUse": tool_use}}}
             yield {"contentBlockDelta": {"delta": {"toolUse": {"input": json.dumps(args)}}}}
             yield {"contentBlockStop": {}}

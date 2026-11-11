@@ -239,7 +239,9 @@ async def test_signed_runtime_transport_runs_real_mcp_and_refreshes_credentials(
                 "compare_values",
                 {"baseline": 100, "current": 120},
             )
-            assert result["structuredContent"]["preview_rows"][0]["percent_change"] == 20
+            structured = result.get("structuredContent")
+            assert structured is not None
+            assert structured["preview_rows"][0]["percent_change"] == 20
         finally:
             await asyncio.to_thread(client.stop, None, None, None)
     assert len(credentials) == len(requests)

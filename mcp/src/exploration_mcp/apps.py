@@ -47,7 +47,7 @@ def dashboard_app(explorer: DataExplorer, store: ResultStore) -> Apps:
         return CallToolResult(
             content=[TextContent(text=json.dumps(summary, ensure_ascii=False, allow_nan=False))],
             structured_content=summary,
-            meta={"preview": preview},
+            _meta={"preview": preview},
         )
 
     return apps

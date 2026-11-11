@@ -3,9 +3,10 @@
 from collections.abc import Callable, Sequence
 from functools import partial
 from types import SimpleNamespace
+from typing import cast
 
 import uvicorn
-from ag_ui_strands import add_strands_fastapi_endpoint
+from ag_ui_strands import StrandsAgent, add_strands_fastapi_endpoint
 from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from strands.models.model import Model
@@ -37,8 +38,9 @@ def create_app(
         return {"status": "Healthy", "mode": mode}
 
     # The endpoint only calls run(), so each run can get its own agent and MCP connection.
+    # The runner duck-types StrandsAgent for that one method.
     runner = SimpleNamespace(run=partial(agui_events, model_factory=model_factory, mcp=mcp))
-    add_strands_fastapi_endpoint(app, runner, "/invocations")
+    add_strands_fastapi_endpoint(app, cast(StrandsAgent, runner), "/invocations")
     return app
 
 
