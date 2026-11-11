@@ -18,8 +18,7 @@ export async function* relay(source: Readable, run: Run, signal: AbortSignal, cl
       bytes += chunk.length;
       if (bytes > 8 * 1024 * 1024) throw new Error("response limit");
       pending += decoder.decode(chunk, { stream: true });
-      let match: RegExpExecArray | null;
-      while ((match = /\r?\n\r?\n/.exec(pending))) {
+      for (let match = /\r?\n\r?\n/.exec(pending); match; match = /\r?\n\r?\n/.exec(pending)) {
         if (Buffer.byteLength(pending.slice(0, match.index), "utf8") > 2 * 1024 * 1024)
           throw new Error("frame limit");
         const frame = pending.slice(0, match.index + match[0].length);

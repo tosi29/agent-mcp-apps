@@ -34,7 +34,7 @@ await visit(staging);
 await rm(path.join(root, "dist/web.zip"), { force: true });
 const result = spawnSync("zip", ["-Xq", "../web.zip", "-@"], {
   cwd: staging,
-  input: files.sort().join("\n") + "\n",
+  input: `${files.sort().join("\n")}\n`,
   stdio: ["pipe", "inherit", "inherit"],
   env: { ...process.env, TZ: "UTC" },
 });

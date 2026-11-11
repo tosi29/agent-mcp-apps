@@ -4,7 +4,11 @@ type Row = Record<string, string | number | null>;
 const app = new App({ name: "取引ダッシュボード", version: "1.0.0" }, {}, { autoResize: true });
 let rows: Row[] = [];
 let groupBy = "year";
-const element = (id: string) => document.getElementById(id)!;
+const element = (id: string) => {
+  const found = document.getElementById(id);
+  if (!found) throw new Error(`missing element: ${id}`);
+  return found;
+};
 const metric = element("metric") as HTMLSelectElement;
 const format = (value: unknown) =>
   typeof value === "number" ? value.toLocaleString("ja-JP") : "—";

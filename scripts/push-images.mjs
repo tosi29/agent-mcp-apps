@@ -105,7 +105,7 @@ function main() {
     variables[`${name}_image_digest`] = digest;
     console.log(`[${name}] ダイジェスト: ${digest}`);
   }
-  const json = JSON.stringify(variables, null, 2) + "\n";
+  const json = `${JSON.stringify(variables, null, 2)}\n`;
   const temporary = `${variablesFile}.${process.pid}.tmp`;
   try {
     writeFileSync(temporary, json, { flag: "wx", mode: 0o600 });

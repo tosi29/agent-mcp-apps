@@ -416,6 +416,7 @@ tr:last-child td {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: 動きを減らす設定は個別のanimation指定より優先する */
     animation: none !important;
   }
 }

@@ -29,7 +29,7 @@ test("AgentCore relay preserves a large Apps event across chunks and Unicode bou
     type: "CUSTOM",
     name: "data_result",
     value: {
-      app: { html: "<html>" + "<p>取引データ</p>".repeat(35_000) + "</html>" },
+      app: { html: `<html>${"<p>取引データ</p>".repeat(35_000)}</html>` },
     },
   });
   const wire = Buffer.from(start + event + finish);

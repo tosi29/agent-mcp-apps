@@ -84,17 +84,17 @@ export function McpAppResultView({ app, sandboxUrl }: { app: McpAppResult; sandb
     };
     window.addEventListener("message", originGuard);
     const ready = (event: MessageEvent) => {
+      const target = iframe.contentWindow;
       if (
-        event.source !== iframe.contentWindow ||
+        !target ||
+        event.source !== target ||
         event.origin !== sandbox.origin ||
         event.data?.method !== "ui/notifications/sandbox-proxy-ready"
       )
         return;
       window.removeEventListener("message", ready);
       void (async () => {
-        await bridge.connect(
-          new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!),
-        );
+        await bridge.connect(new PostMessageTransport(target, target));
         if (!disposed)
           await bridge.sendSandboxResourceReady({
             html: app.html,

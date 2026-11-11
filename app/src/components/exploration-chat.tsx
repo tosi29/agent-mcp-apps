@@ -89,6 +89,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
     return () => subscription.unsubscribe();
   }, [agent]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 結果が増えたときに末尾へ追従するためrunsを契機にする
   useEffect(() => {
     if (followResults.current && historyRef.current) {
       historyRef.current.scrollTop = historyRef.current.scrollHeight;
@@ -137,7 +138,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
             <h2>ツールの実行結果</h2>
             {runs.length > 0 && <span className="small-note">{runs.length}件の質問</span>}
           </div>
-          <div
+          <section
             className="result-history"
             ref={historyRef}
             onScroll={(event) => {
@@ -145,8 +146,8 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
               followResults.current =
                 panel.scrollHeight - panel.scrollTop - panel.clientHeight < 48;
             }}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: スクロール領域をキーボードで操作できるようにする
             tabIndex={0}
-            role="region"
             aria-label="実行結果の履歴"
           >
             {runs.length === 0 ? (
@@ -229,7 +230,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
                 </details>
               ))
             )}
-          </div>
+          </section>
         </section>
       </div>
     </>
@@ -258,6 +259,7 @@ function ResultTable({ result, label }: { result: DataResult; label: string }) {
             </thead>
             <tbody>
               {result.preview_rows.map((row, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: プレビュー行は一意なIDを持たず、表示中に並び替えない
                 <tr key={index}>
                   {columns.map((column) => (
                     <td key={column}>
