@@ -134,9 +134,10 @@ fixtureモードは固定シナリオで動く。「ダッシュボード」「�
 
 ## テスト
 
-`app/` で型チェックとビルドを実行する。
+`app/` でlint・型チェック・ビルドを実行する。整形とlintはBiome（設定はリポジトリ直下の `biome.json`）で行い、`npm run lint:fix` で自動修正する。
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run build

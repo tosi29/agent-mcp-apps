@@ -173,4 +173,5 @@ uv run --locked pytest -q
 HTTPテストは5ツールの公開・UIリソース取得・テキストフォールバック・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
 Strandsとの実HTTP接続・AG-UI結果イベント・モデル履歴との分離は `agent/` の `uv run --locked pytest -q` で確認する。
 UIの描画処理・指標切り替え・0件表示は `npm --prefix mcp/ui test`（リポジトリ直下）で検査する。
+UIの整形とlintは `npm --prefix mcp/ui run lint` で検査し、`npm --prefix mcp/ui run lint:fix` で自動修正する。
 これは模擬DOM上のテストで、実ブラウザの描画・sandbox隔離の検証とは区別する。
