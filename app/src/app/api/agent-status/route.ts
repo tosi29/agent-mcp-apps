@@ -1,4 +1,4 @@
-import { backendStatus, allowedOrigin } from "../../../lib/backend";
+import { allowedOrigin, backendStatus } from "../../../lib/backend";
 
 export const dynamic = "force-dynamic";
 

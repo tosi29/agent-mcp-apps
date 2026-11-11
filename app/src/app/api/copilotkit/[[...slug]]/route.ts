@@ -3,7 +3,7 @@ import {
   createCopilotRuntimeHandler,
   InMemoryAgentRunner,
 } from "@copilotkit/runtime/v2";
-import { backendAgent, allowedOrigin } from "../../../../lib/backend";
+import { allowedOrigin, backendAgent } from "../../../../lib/backend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,10 @@ async function handle(request: Request) {
   try {
     return await handler(request);
   } catch {
-    return Response.json({ error: "エージェントに接続できません。起動状態を確認してください。" }, { status: 502 });
+    return Response.json(
+      { error: "エージェントに接続できません。起動状態を確認してください。" },
+      { status: 502 },
+    );
   }
 }
 

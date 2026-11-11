@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { request } from "node:http";
 import { once } from "node:events";
+import { request } from "node:http";
+import { test } from "node:test";
 import { runInNewContext } from "node:vm";
-import { createSandboxServer, sandboxDocument } from "./mcp-apps-sandbox.mjs";
 import { sandboxHeaders } from "../src/lib/mcp-apps-sandbox.ts";
+import { createSandboxServer, sandboxDocument } from "./mcp-apps-sandbox.mjs";
 
-test("sandbox HTTP response restricts networks, frames, permissions and embedding origins", async t => {
+test("sandbox HTTP response restricts networks, frames, permissions and embedding origins", async (t) => {
   const server = createSandboxServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -15,17 +15,27 @@ test("sandbox HTTP response restricts networks, frames, permissions and embeddin
   const response = await fetch(url);
   assert.equal(response.status, 200);
   const csp = response.headers.get("content-security-policy");
-  for (const directive of ["connect-src 'none'", "frame-src 'self'", "object-src 'none'", "base-uri 'none'", "form-action 'none'", "frame-ancestors http://127.0.0.1:3000 http://localhost:3000"]) {
+  for (const directive of [
+    "connect-src 'none'",
+    "frame-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors http://127.0.0.1:3000 http://localhost:3000",
+  ]) {
     assert.ok(csp.includes(directive));
   }
   assert.ok(response.headers.get("permissions-policy").includes("camera=()"));
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal((await fetch(url.replace("/sandbox", "/other"))).status, 404);
   await new Promise((resolve, reject) => {
-    request(url, { headers: { host: "evil.invalid" } }, response => {
+    request(url, { headers: { host: "evil.invalid" } }, (response) => {
       assert.equal(response.statusCode, 403);
-      response.resume(); response.on("end", resolve);
-    }).on("error", reject).end();
+      response.resume();
+      response.on("end", resolve);
+    })
+      .on("error", reject)
+      .end();
   });
 });
 
@@ -35,18 +45,37 @@ test("proxy relays only the configured host and its own view and accepts HTML on
   const parentMessages = [];
   const viewMessages = [];
   const parent = { postMessage: (message, origin) => parentMessages.push({ message, origin }) };
-  const view = { setAttribute: () => {}, contentWindow: {
-    postMessage: (message, origin) => viewMessages.push({ message, origin }),
-  } };
+  const view = {
+    setAttribute: () => {},
+    contentWindow: {
+      postMessage: (message, origin) => viewMessages.push({ message, origin }),
+    },
+  };
   let receive;
-  const window = { parent, addEventListener: (_type, callback) => { receive = callback; } };
-  const document = { referrer: `${hostOrigin}/`, createElement: () => view, body: { append: () => {} } };
+  const window = {
+    parent,
+    addEventListener: (_type, callback) => {
+      receive = callback;
+    },
+  };
+  const document = {
+    referrer: `${hostOrigin}/`,
+    createElement: () => view,
+    body: { append: () => {} },
+  };
   const html = sandboxDocument([hostOrigin]);
   runInNewContext(html.match(/<script>([\s\S]*)<\/script>/)[1], {
-    window, document, URL, location: { origin: proxyOrigin },
+    window,
+    document,
+    URL,
+    location: { origin: proxyOrigin },
   });
   assert.equal(parentMessages[0].message.method, "ui/notifications/sandbox-proxy-ready");
-  const resource = { jsonrpc: "2.0", method: "ui/notifications/sandbox-resource-ready", params: { html: "<html>test</html>" } };
+  const resource = {
+    jsonrpc: "2.0",
+    method: "ui/notifications/sandbox-resource-ready",
+    params: { html: "<html>test</html>" },
+  };
   receive({ source: parent, origin: "https://evil.invalid", data: resource });
   receive({ source: {}, origin: hostOrigin, data: resource });
   assert.equal(view.srcdoc, undefined);
@@ -54,7 +83,11 @@ test("proxy relays only the configured host and its own view and accepts HTML on
   assert.ok(view.srcdoc.endsWith(resource.params.html));
   assert.ok(view.srcdoc.includes("frame-src 'none'"));
   const original = view.srcdoc;
-  receive({ source: parent, origin: hostOrigin, data: { ...resource, params: { html: "replacement" } } });
+  receive({
+    source: parent,
+    origin: hostOrigin,
+    data: { ...resource, params: { html: "replacement" } },
+  });
   assert.equal(view.srcdoc, original);
   const initialized = { jsonrpc: "2.0", method: "ui/notifications/initialized" };
   receive({ source: view.contentWindow, origin: "https://evil.invalid", data: initialized });
@@ -74,7 +107,13 @@ test("cloud sandbox embeds only the configured origin and rejects invalid allowl
   const headers = sandboxHeaders([origin]);
   assert.ok(headers["Content-Security-Policy"].endsWith(`frame-ancestors ${origin}`));
   assert.ok(sandboxDocument([origin]).includes(JSON.stringify(origin)));
-  for (const origins of [[], ["*"], ["https://example.com/path"], ["https://user:password@example.com"], ["https://example.com\nX-Test: bad"]]) {
+  for (const origins of [
+    [],
+    ["*"],
+    ["https://example.com/path"],
+    ["https://user:password@example.com"],
+    ["https://example.com\nX-Test: bad"],
+  ]) {
     assert.throws(() => sandboxHeaders(origins));
     assert.throws(() => sandboxDocument(origins));
   }

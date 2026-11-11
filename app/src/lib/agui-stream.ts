@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
 export type Run = { threadId: string; runId: string };
 type Event = { type: string; threadId?: string; runId?: string };
@@ -20,21 +20,29 @@ export async function* relay(source: Readable, run: Run, signal: AbortSignal, cl
       pending += decoder.decode(chunk, { stream: true });
       let match: RegExpExecArray | null;
       while ((match = /\r?\n\r?\n/.exec(pending))) {
-        if (Buffer.byteLength(pending.slice(0, match.index), "utf8") > 2 * 1024 * 1024) throw new Error("frame limit");
+        if (Buffer.byteLength(pending.slice(0, match.index), "utf8") > 2 * 1024 * 1024)
+          throw new Error("frame limit");
         const frame = pending.slice(0, match.index + match[0].length);
         pending = pending.slice(frame.length);
-        const data = frame.split(/\r?\n/).filter(line => line.startsWith("data:"))
-          .map(line => line.slice(5).replace(/^ /, "")).join("\n");
+        const data = frame
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).replace(/^ /, ""))
+          .join("\n");
         const event: Event | null = data ? JSON.parse(data) : null;
         if (event) {
           if (typeof event.type !== "string" || (!started && event.type !== "RUN_STARTED")) {
             throw new Error("invalid event");
           }
           if (event.type === "RUN_STARTED") {
-            if (started || event.runId !== run.runId || event.threadId !== run.threadId) throw new Error("invalid start");
+            if (started || event.runId !== run.runId || event.threadId !== run.threadId)
+              throw new Error("invalid start");
             started = true;
           }
-          if (event.type === "RUN_FINISHED" && (event.runId !== run.runId || event.threadId !== run.threadId)) {
+          if (
+            event.type === "RUN_FINISHED" &&
+            (event.runId !== run.runId || event.threadId !== run.threadId)
+          ) {
             throw new Error("invalid finish");
           }
         }
@@ -46,8 +54,11 @@ export async function* relay(source: Readable, run: Run, signal: AbortSignal, cl
     throw new Error("missing terminal event");
   } catch {
     if (!started) yield sse({ type: "RUN_STARTED", ...run });
-    yield sse({ type: "RUN_ERROR", code: signal.aborted ? "AGENT_TIMEOUT" : "AGENT_STREAM_FAILED",
-      message: "応答の受信に失敗しました。時間をおいて再実行してください。" });
+    yield sse({
+      type: "RUN_ERROR",
+      code: signal.aborted ? "AGENT_TIMEOUT" : "AGENT_STREAM_FAILED",
+      message: "応答の受信に失敗しました。時間をおいて再実行してください。",
+    });
   } finally {
     signal.removeEventListener("abort", abort);
     source.destroy();

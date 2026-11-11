@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -12,7 +20,10 @@ function fixture(t, variables) {
   const directory = mkdtempSync(path.join(tmpdir(), "push-images-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   for (const name of ["scripts", "terraform", "bin"]) mkdirSync(path.join(directory, name));
-  copyFileSync(new URL("./push-images.mjs", import.meta.url), path.join(directory, "scripts/push-images.mjs"));
+  copyFileSync(
+    new URL("./push-images.mjs", import.meta.url),
+    path.join(directory, "scripts/push-images.mjs"),
+  );
   const file = path.join(directory, "terraform/images.auto.tfvars.json");
   if (variables !== undefined) writeFileSync(file, JSON.stringify(variables));
   const log = path.join(directory, "commands.jsonl");
@@ -41,32 +52,42 @@ else if (name === 'aws') {
   }
   return {
     file,
-    calls: () => existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").map(JSON.parse) : [],
-    run: (target, env = {}) => spawnSync(process.execPath, [path.join(directory, "scripts/push-images.mjs"), target], {
-      cwd: tmpdir(), encoding: "utf8",
-      env: { ...process.env, PATH: path.join(directory, "bin"), MOCK_LOG: log, ...env },
-    }),
+    calls: () =>
+      existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").map(JSON.parse) : [],
+    run: (target, env = {}) =>
+      spawnSync(process.execPath, [path.join(directory, "scripts/push-images.mjs"), target], {
+        cwd: tmpdir(),
+        encoding: "utf8",
+        env: { ...process.env, PATH: path.join(directory, "bin"), MOCK_LOG: log, ...env },
+      }),
   };
 }
 
-test("all pushes both ARM64 images and reports the saved digests without leaking the password", t => {
+test("all pushes both ARM64 images and reports the saved digests without leaking the password", (t) => {
   const f = fixture(t);
   const result = f.run("all");
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(JSON.parse(readFileSync(f.file)), { agent_image_digest: agentDigest, mcp_image_digest: mcpDigest });
-  for (const value of [agentDigest, mcpDigest, f.file, "JSON更新"]) assert.ok(result.stdout.includes(value));
+  assert.deepEqual(JSON.parse(readFileSync(f.file)), {
+    agent_image_digest: agentDigest,
+    mcp_image_digest: mcpDigest,
+  });
+  for (const value of [agentDigest, mcpDigest, f.file, "JSON更新"])
+    assert.ok(result.stdout.includes(value));
   assert.ok(!result.stdout.includes("test-password-never-print"));
   assert.ok(!result.stderr.includes("test-password-never-print"));
   const calls = f.calls();
-  assert.equal(calls.filter(c => c.name === "docker" && c.args[0] === "login").length, 1);
-  const builds = calls.filter(c => c.name === "docker" && c.args[0] === "build");
-  assert.deepEqual(builds.map(c => c.args.at(-1)), ["agent", "mcp"]);
-  assert.ok(builds.every(c => c.args.includes("linux/arm64")));
-  assert.ok(!calls.some(c => c.name === "terraform" && c.args.includes("apply")));
+  assert.equal(calls.filter((c) => c.name === "docker" && c.args[0] === "login").length, 1);
+  const builds = calls.filter((c) => c.name === "docker" && c.args[0] === "build");
+  assert.deepEqual(
+    builds.map((c) => c.args.at(-1)),
+    ["agent", "mcp"],
+  );
+  assert.ok(builds.every((c) => c.args.includes("linux/arm64")));
+  assert.ok(!calls.some((c) => c.name === "terraform" && c.args.includes("apply")));
 });
 
 for (const target of ["agent", "mcp"]) {
-  test(`${target} updates only its own digest`, t => {
+  test(`${target} updates only its own digest`, (t) => {
     const other = target === "agent" ? "mcp" : "agent";
     const previous = `sha256:${"c".repeat(64)}`;
     const f = fixture(t, { [`${other}_image_digest`]: previous });
@@ -76,11 +97,11 @@ for (const target of ["agent", "mcp"]) {
       [`${other}_image_digest`]: previous,
       [`${target}_image_digest`]: target === "agent" ? agentDigest : mcpDigest,
     });
-    assert.equal(f.calls().filter(c => c.name === "docker" && c.args[0] === "push").length, 1);
+    assert.equal(f.calls().filter((c) => c.name === "docker" && c.args[0] === "push").length, 1);
   });
 }
 
-test("a second image failure leaves the existing JSON intact", t => {
+test("a second image failure leaves the existing JSON intact", (t) => {
   const previous = { agent_image_digest: mcpDigest, mcp_image_digest: agentDigest };
   const f = fixture(t, previous);
   const before = readFileSync(f.file, "utf8");
@@ -91,7 +112,7 @@ test("a second image failure leaves the existing JSON intact", t => {
   assert.ok(!result.stdout.includes("JSON更新:"));
 });
 
-test("invalid input fails before external commands", t => {
+test("invalid input fails before external commands", (t) => {
   const f = fixture(t, { agent_image_digest: "invalid" });
   assert.equal(f.run("all").status, 1);
   assert.equal(f.run("unknown").status, 1);

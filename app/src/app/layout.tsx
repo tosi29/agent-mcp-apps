@@ -12,5 +12,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Prerendered pages emit duplicate x-nextjs-prerender headers in Next.js 16.4.
   // Web Adapter serializes duplicates as an array, which REST API streaming rejects.
   await connection();
-  return <html lang="ja"><body>{children}</body></html>;
+  return (
+    <html lang="ja">
+      <body>{children}</body>
+    </html>
+  );
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const variablesFile = path.join(root, "terraform/images.auto.tfvars.json");
@@ -35,7 +35,7 @@ function readVariables() {
     throw new Error("images.auto.tfvars.jsonはJSONオブジェクトにしてください");
   }
   for (const [key, digest] of Object.entries(value)) {
-    if (!names.some(name => key === `${name}_image_digest`) || !digestPattern.test(digest)) {
+    if (!names.some((name) => key === `${name}_image_digest`) || !digestPattern.test(digest)) {
       throw new Error(`images.auto.tfvars.jsonの項目が不正です: ${key}`);
     }
   }
@@ -52,13 +52,19 @@ function main() {
   const variables = readVariables();
   const selected = target === "all" ? names : [target];
   // Resolve all repositories before building or pushing either image.
-  const repositories = selected.map(name => {
-    const url = run("terraform", ["-chdir=terraform", "output", "-raw", `${name}_repository_url`],
-      { capture: true });
+  const repositories = selected.map((name) => {
+    const url = run("terraform", ["-chdir=terraform", "output", "-raw", `${name}_repository_url`], {
+      capture: true,
+    });
     if (!/^\d{12}\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/[a-z0-9][a-z0-9/_.-]*$/.test(url)) {
       throw new Error(`${name}のECR URLが不正です。Terraformのoutputを確認してください`);
     }
-    return { name, url, registry: url.split("/")[0], repository: url.split("/").slice(1).join("/") };
+    return {
+      name,
+      url,
+      registry: url.split("/")[0],
+      repository: url.split("/").slice(1).join("/"),
+    };
   });
   const commit = run("git", ["rev-parse", "--short=12", "HEAD"], { capture: true });
   // ECR uses immutable tags; a fresh suffix allows rebuilding the same commit.
@@ -67,16 +73,34 @@ function main() {
   for (const { name, url, registry, repository } of repositories) {
     console.log(`\n[${name}] ビルド・push先: ${url}:${tag}`);
     if (!loggedIn.has(registry)) {
-      const password = run("aws", ["ecr", "get-login-password", "--region", region], { capture: true });
-      run("docker", ["login", "--username", "AWS", "--password-stdin", registry],
-        { input: `${password}\n` });
+      const password = run("aws", ["ecr", "get-login-password", "--region", region], {
+        capture: true,
+      });
+      run("docker", ["login", "--username", "AWS", "--password-stdin", registry], {
+        input: `${password}\n`,
+      });
       loggedIn.add(registry);
     }
     run("docker", ["build", "--platform", "linux/arm64", "-t", `${url}:${tag}`, name]);
     run("docker", ["push", `${url}:${tag}`]);
-    const digest = run("aws", ["ecr", "describe-images", "--region", region,
-      "--repository-name", repository, "--image-ids", `imageTag=${tag}`,
-      "--query", "imageDetails[0].imageDigest", "--output", "text"], { capture: true });
+    const digest = run(
+      "aws",
+      [
+        "ecr",
+        "describe-images",
+        "--region",
+        region,
+        "--repository-name",
+        repository,
+        "--image-ids",
+        `imageTag=${tag}`,
+        "--query",
+        "imageDetails[0].imageDigest",
+        "--output",
+        "text",
+      ],
+      { capture: true },
+    );
     if (!digestPattern.test(digest)) throw new Error(`${name}のダイジェストが不正です`);
     variables[`${name}_image_digest`] = digest;
     console.log(`[${name}] ダイジェスト: ${digest}`);
@@ -96,6 +120,8 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(`エラー: ${error.message}\nJSONは更新していません。push済みのイメージはECRに残ります。`);
+  console.error(
+    `エラー: ${error.message}\nJSONは更新していません。push済みのイメージはECRに残ります。`,
+  );
   process.exitCode = 1;
 }

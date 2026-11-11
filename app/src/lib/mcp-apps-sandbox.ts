@@ -3,7 +3,8 @@ function validateHostOrigins(hostOrigins: readonly string[]) {
   if (!hostOrigins.length) throw new Error("Missing host origin");
   for (const origin of hostOrigins) {
     const parsed = new URL(origin);
-    if (parsed.origin !== origin || !["http:", "https:"].includes(parsed.protocol)) throw new Error("Invalid host origin");
+    if (parsed.origin !== origin || !["http:", "https:"].includes(parsed.protocol))
+      throw new Error("Invalid host origin");
   }
 }
 
@@ -13,9 +14,16 @@ export function sandboxHeaders(hostOrigins: readonly string[]): Record<string, s
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
     "Content-Security-Policy": [
-      "default-src 'none'", "script-src 'unsafe-inline'", "style-src 'unsafe-inline'",
-      "connect-src 'none'", "img-src data:", "frame-src 'self'", "base-uri 'none'",
-      "object-src 'none'", "form-action 'none'", `frame-ancestors ${hostOrigins.join(" ")}`,
+      "default-src 'none'",
+      "script-src 'unsafe-inline'",
+      "style-src 'unsafe-inline'",
+      "connect-src 'none'",
+      "img-src data:",
+      "frame-src 'self'",
+      "base-uri 'none'",
+      "object-src 'none'",
+      "form-action 'none'",
+      `frame-ancestors ${hostOrigins.join(" ")}`,
     ].join("; "),
     "X-Content-Type-Options": "nosniff",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), clipboard-write=()",

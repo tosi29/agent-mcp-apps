@@ -1,9 +1,12 @@
 // Static sandbox proxy only. It has no MCP credentials or business-data endpoint.
 import { createServer } from "node:http";
 import { sandboxDocument, sandboxHeaders } from "../src/lib/mcp-apps-sandbox.ts";
+
 export { sandboxDocument } from "../src/lib/mcp-apps-sandbox.ts";
 
-export function createSandboxServer(hostOrigins = ["http://127.0.0.1:3000", "http://localhost:3000"]) {
+export function createSandboxServer(
+  hostOrigins = ["http://127.0.0.1:3000", "http://localhost:3000"],
+) {
   const headers = sandboxHeaders(hostOrigins);
   return createServer((request, response) => {
     const hostname = (request.headers.host ?? "").split(":")[0];
