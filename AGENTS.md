@@ -72,6 +72,7 @@ MCP AppのHTMLは先に `npm --prefix mcp/ui ci --ignore-scripts` と `npm --pre
 ```sh
 uv run --locked ruff check src tests
 uv run --locked ruff format --check src tests
+uv run --locked pyright src tests
 uv run --locked pytest -q
 ```
 

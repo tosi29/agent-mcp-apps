@@ -39,6 +39,7 @@ jobs:
         run: |
           uv run --locked ruff check src tests
           uv run --locked ruff format --check src tests
+          uv run --locked pyright src tests
           uv run --locked pytest -q
       # agentの統合テストは、上で作ったmcpの仮想環境からMCPサーバーを起動する。
       - name: agent
@@ -46,6 +47,7 @@ jobs:
         run: |
           uv run --locked ruff check src tests
           uv run --locked ruff format --check src tests
+          uv run --locked pyright src tests
           uv run --locked pytest -q
 
   app:

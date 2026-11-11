@@ -182,6 +182,7 @@ Transaction Searchの有効化が必要。送信権限・配備手順は [Terraf
 ```sh
 uv run --locked ruff check src tests
 uv run --locked ruff format --check src tests
+uv run --locked pyright src tests
 uv run --locked pytest -q
 ```
 

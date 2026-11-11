@@ -165,6 +165,7 @@ Terraform配備時はAWS exporterへ切り替え、CloudWatchへ送信する。
 ```sh
 uv run --locked ruff check src tests
 uv run --locked ruff format --check src tests
+uv run --locked pyright src tests
 uv run --locked pytest -q
 ```
 
