@@ -8,7 +8,7 @@ from typing import cast
 import uvicorn
 from ag_ui_strands import StrandsAgent, add_strands_fastapi_endpoint
 from fastapi import FastAPI
-from starlette.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from strands.models.model import Model
 
 from exploration_agent.agui import agui_events

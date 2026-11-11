@@ -1,1 +1,1 @@
-"""Independent MCP tools; no agent SDK or database dependency."""
+"""Independent MCP tools and their DuckDB queries; no agent SDK dependency."""

@@ -75,7 +75,7 @@ src/exploration_agent/
 ├── observability.py     # ログ・トレース・メトリクス
 ├── entrypoints/         # 起動の入口：server（AG-UI）、agentcore
 ├── tools/               # 通常のPythonツール：echo、web（web_search・web_fetch）
-└── mcp_clients/         # MCPへの接続：exploration、apps、docs、agentcore（SigV4署名）
+└── mcp_clients/         # MCPへの接続：target（接続先の検証）、exploration、apps、docs、agentcore（SigV4署名）
 ```
 
 ## Web検索（Tavily）

@@ -86,7 +86,7 @@ terraform -chdir=terraform apply web.tfplan
 terraform -chdir=terraform output -raw web_url
 ```
 
-`web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送ると設定したモードで実行する。
+`web_url` の末尾 `/poc/` まで含むURLをブラウザで開く。画面から質問を送るとさくらで実行する。
 state、tfvars、plan、ZIP、実行結果はGitに含めない。
 
 ## MCPの配備
@@ -218,8 +218,8 @@ CloudWatchへの到達は、反映後に新しいセッションで呼び出し�
 - APIのリソースポリシーで指定CIDR以外を明示的に拒否する。OIDCとユーザー単位の認証は未実装。
 - API Gatewayの `STREAM` とWeb Adapterの `response_stream` を併用し、Next.jsの圧縮は無効にする。
 - AgentCore呼び出しは自動再試行せず、runごとに新しいセッションを使う。会話はAG-UIメッセージで渡す。
-- 接続状態は `GetAgentRuntime` のREADY状態、モードは同APIの環境設定から判定する。推論品質やAPIキーの有効性を示すものではない。
-- 上流SSEは2MiB・1フレーム256K文字まで。
+- 接続状態は `GetAgentRuntime` のREADY状態で判定し、モードは常に `sakura` と表示する。推論品質やAPIキーの有効性を示すものではない。
+- AgentCoreからの中継は応答全体8MiB・1イベント2MiBまで。
 - エージェントの1質問は300秒、AgentCoreへの通信は310秒、Lambdaは330秒、API Gatewayは335秒で制限する。上流の異常終了は `RUN_ERROR` にする。
 - APIは毎秒10件・バースト30件でスロットリングする。静的ファイル取得も対象で、費用の厳密な上限ではない。
 - エージェントとMCPのログ・トレース・メトリクスはADOTで有効にする。質問・回答・ツール引数・結果も記録対象。キーや認証ヘッダーは記録しない。Lambdaログは7日保持。
