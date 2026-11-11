@@ -2,9 +2,9 @@
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from contextlib import aclosing
-from functools import partial
+from typing import Any, cast
 
 from ag_ui.core import CustomEvent, EventType, RunAgentInput, RunErrorEvent, RunStartedEvent
 from ag_ui_strands import StrandsAgent, StrandsAgentConfig, ToolBehavior
@@ -22,7 +22,9 @@ from exploration_agent.observability import log_callback
 logger = logging.getLogger(__name__)
 
 
-def _build_adapter(template: Agent, app_loader: Callable[[], Awaitable[dict]]) -> StrandsAgent:
+def _build_adapter(
+    template: Agent, app_loader: Callable[[], Coroutine[Any, Any, dict]]
+) -> StrandsAgent:
     """Use the maintained Strands adapter, with fresh per-request hooks and tools."""
     results = ToolResultHook(app_loader)
 
@@ -50,6 +52,16 @@ def _build_adapter(template: Agent, app_loader: Callable[[], Awaitable[dict]]) -
     )
 
 
+def _app_loader(mcp: MCPTarget | None) -> Callable[[], Coroutine[Any, Any, dict]]:
+    async def load() -> dict:
+        # The dashboard tool exists only when the exploration MCP server is configured.
+        if mcp is None:
+            raise RuntimeError("Exploration MCP is not configured")
+        return await load_app_resources(mcp)
+
+    return load
+
+
 def _trusted_input(run: RunAgentInput) -> RunAgentInput:
     # Do not expose frontend tools, arbitrary UI state, or injected A2UI configuration.
     # Reasoning is displayed by the client, but is not replayed as conversation input.
@@ -71,7 +83,7 @@ async def agui_events(
     *,
     mcp: MCPTarget | None = None,
     timeout_seconds: float = 300,
-) -> AsyncIterator:
+) -> AsyncGenerator[Any, None]:
     """Stream one run. Every failure ends it once, with a fixed message for the client."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout_seconds
@@ -80,8 +92,10 @@ async def agui_events(
         # The cloud factory can fetch a SecureString. Keep that I/O off the event loop.
         model = await asyncio.to_thread(model_factory)
         async with exploration_agent(model, mcp) as template:
-            adapter = _build_adapter(template, partial(load_app_resources, mcp))
-            async with aclosing(adapter.run(_trusted_input(run))) as stream:
+            adapter = _build_adapter(template, _app_loader(mcp))
+            # run() is an async generator, although the adapter annotates an AsyncIterator.
+            stream = cast(AsyncGenerator[Any, None], adapter.run(_trusted_input(run)))
+            async with aclosing(stream):
                 while True:
                     # The endpoint runs each step in its own task, so asyncio.timeout()
                     # cannot span steps.

@@ -71,16 +71,16 @@ class DocsMCPHook(HookProvider):
             return
         if event.selected_tool is not None:
             # MCPClient has no option for this; MCPAgentTool reads it on each call.
-            event.selected_tool.timeout = TOOL_TIMEOUT
+            event.selected_tool.timeout = TOOL_TIMEOUT  # pyright: ignore[reportAttributeAccessIssue]
 
     def after_tool(self, event: AfterToolCallEvent) -> None:
         if event.tool_use["name"] not in DOCS_TOOL_NAMES:
             return
         result = event.result
         body = "\n".join(
-            block["text"]
+            text
             for block in result.get("content", [])
-            if isinstance(block.get("text"), str)
+            if isinstance(text := block.get("text"), str)
         )
         text = body[:MAX_RESULT_CHARS]
         if len(body) > MAX_RESULT_CHARS:

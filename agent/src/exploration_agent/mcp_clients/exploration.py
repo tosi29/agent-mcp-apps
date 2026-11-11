@@ -22,7 +22,8 @@ def build_mcp_clients(target: MCPTarget | None) -> list[MCPClient]:
     return [
         MCPClient(
             url=target.url,
-            auth_provider=target.auth(),
+            # Strands annotates httpx.Auth, but passes it to the MCP SDK, which uses httpx2.
+            auth_provider=target.auth(),  # pyright: ignore[reportArgumentType]
             startup_timeout=target.startup_timeout,
             tool_filters={"allowed": list(MCP_TOOL_NAMES)},
         )

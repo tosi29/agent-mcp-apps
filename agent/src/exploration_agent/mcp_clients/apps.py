@@ -1,7 +1,11 @@
 """Fetch the UI resource through MCP, never through model conversation state."""
 
 from mcp import ClientSession
-from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+from mcp.client.streamable_http import (
+    create_mcp_http_client,  # pyright: ignore[reportPrivateImportUsage]
+    streamable_http_client,
+)
+from mcp.types import TextResourceContents
 
 from exploration_agent.mcp_clients.target import MCPTarget
 
@@ -27,4 +31,7 @@ async def load_app_resources(target: MCPTarget) -> dict:
     ):
         await session.initialize()
         resource = await session.read_resource(APP_URI)
-    return {"resourceUri": APP_URI, "mimeType": APP_MIME, "html": resource.contents[0].text}
+    contents = resource.contents[0]
+    if not isinstance(contents, TextResourceContents):
+        raise ValueError("MCP App resource must be text")
+    return {"resourceUri": APP_URI, "mimeType": APP_MIME, "html": contents.text}
