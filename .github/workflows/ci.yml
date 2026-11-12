@@ -26,8 +26,6 @@ jobs:
           cache: npm
           cache-dependency-path: mcp/ui/package-lock.json
       - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          version: "0.13.5" # agent/Dockerfile・mcp/Dockerfileと揃える
       # MCPサーバーは生成済みのMCP App HTMLがないと起動しない。
       - name: MCP AppのHTMLをビルド・テスト
         run: |
