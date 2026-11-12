@@ -1,4 +1,4 @@
-FROM node:26.13.1-bookworm-slim AS ui
+FROM node:26-bookworm-slim AS ui
 WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund

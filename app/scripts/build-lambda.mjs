@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const version = (await readFile(new URL("../../.node-version", import.meta.url), "utf8")).trim();
-if (!/^26\.\d+\.\d+$/.test(version))
-  throw new Error("Lambda build requires a pinned Node.js 26 version");
+if (!/^26$/.test(version)) throw new Error("Lambda build requires Node.js 26 (major version only)");
 const result = spawnSync(
   "docker",
   [

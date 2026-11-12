@@ -27,7 +27,7 @@ Next.jsのZIPはLinux ARM64で作り、Macの `node_modules` は使わない。�
 npm --prefix app run build:lambda
 ```
 
-Amazon Linux 2023と、ルートの `.node-version` から読み取ったNode.js 26の固定版でビルドする。
+Amazon Linux 2023と、ルートの `.node-version` から読み取ったNode.js 26の最新パッチ版でビルドする。
 成果物は `app/dist/web.zip`。Next.jsのstandaloneサーバー、必要な依存、静的ファイル、起動スクリプトを含む。
 `.env` はDockerのコンテキストから除外し、ビルド中はAWS認証情報を渡さない。
 ブラウザ向けURLの接頭辞 `/poc` はビルド時に設定する。
