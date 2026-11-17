@@ -52,7 +52,7 @@ async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
     assert sum(e["type"] == "RUN_FINISHED" for e in events) == 1
     result = next(e["value"] for e in events if e.get("name") == "data_result")
     assert result["total_count"] == 3
-    assert [row["month_count"] for row in result["preview_rows"]] == [12] * 3
+    assert [row["transaction_count"] for row in result["preview_rows"]] == [40] * 3
 
 
 async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
@@ -62,7 +62,7 @@ async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
         body = json.loads(request.content)
         requests.append(deepcopy(body))
         answer = (
-            completion(tool_message("search_office_market", {"limit": 200}), "tool_calls")
+            completion(tool_message("search_transactions", {"limit": 200}), "tool_calls")
             if len(requests) == 1
             else completion({"role": "assistant", "content": "完了"}, "stop")
         )
@@ -94,7 +94,7 @@ async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
     assert events[-1]["type"] == "RUN_FINISHED", events
     preview = next(e["value"] for e in events if e.get("name") == "data_result")
     assert len(preview["preview_rows"]) == 20
-    assert preview["total_count"] == 216
+    assert preview["total_count"] == 360
     tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
     summary = json.loads(tool_result["content"])
     assert len(summary["sample_rows"]) == 3

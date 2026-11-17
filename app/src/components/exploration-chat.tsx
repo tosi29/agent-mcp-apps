@@ -24,24 +24,22 @@ const toolNames: Record<string, string> = {
   microsoft_docs_fetch: "Microsoftドキュメントを取得",
   microsoft_code_sample_search: "Microsoftのコード例を検索",
   describe_dataset: "データ項目を確認",
-  search_office_market: "空室率・賃料を検索",
-  aggregate_office_market: "空室率・賃料を集計",
+  search_transactions: "条件に合う取引を検索",
+  aggregate_transactions: "取引データを集計",
   compare_values: "差分・増減率を計算（MCP）",
-  show_office_market_dashboard: "市況ダッシュボードを表示（MCP Apps）",
+  show_transaction_dashboard: "取引ダッシュボードを表示（MCP Apps）",
 };
 const columnNames: Record<string, string> = {
   year: "年",
-  month: "月",
-  area: "地区",
-  vacancy_rate_pct: "平均空室率（％）",
-  rent_yen_per_tsubo: "平均賃料（円/坪）",
-  month_count: "月数",
-  mean_vacancy_rate_pct: "平均空室率の平均（％）",
-  min_vacancy_rate_pct: "平均空室率の最小（％）",
-  max_vacancy_rate_pct: "平均空室率の最大（％）",
-  mean_rent_yen_per_tsubo: "平均賃料の平均（円/坪）",
-  min_rent_yen_per_tsubo: "平均賃料の最小（円/坪）",
-  max_rent_yen_per_tsubo: "平均賃料の最大（円/坪）",
+  municipality: "地域",
+  quarter: "四半期",
+  transaction_id: "取引ID",
+  transaction_count: "件数",
+  average_price_yen: "平均取引総額（円）",
+  min_price_yen: "最小取引総額（円）",
+  max_price_yen: "最大取引総額（円）",
+  price_yen: "取引総額（円）",
+  area_m2: "面積（㎡）",
   baseline: "基準値",
   current: "比較値",
   difference: "差分",
@@ -121,8 +119,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
             messageView={{ toolCallDisplay: "line", reasoningMessage: { header: ReasoningHeader } }}
             input={{ showDisclaimer: false }}
             labels={{
-              chatInputPlaceholder:
-                "例：千代田区の2020年以降を年別に集計して、平均空室率と平均賃料を教えて",
+              chatInputPlaceholder: "例：新宿区を年別に集計して、件数と平均取引総額を教えて",
               chatInputToolbarSendButtonLabel: "送信",
               chatInputToolbarStopButtonLabel: "停止",
               chatScrollToBottomLabel: "最新の回答へ",
@@ -318,9 +315,7 @@ export function ExplorationChat({ sandboxUrl }: { sandboxUrl?: string }) {
           )}
         </div>
       </header>
-      <div className="dataset-line">
-        オフィス市況 · 東京ビジネス地区・都心5区 · 月次の平均空室率・平均賃料
-      </div>
+      <div className="dataset-line">360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</div>
       {mode === "offline" && (
         <div className="error-banner" role="alert">
           エージェントに接続できません。接続先の状態を確認してから再読み込みしてください。

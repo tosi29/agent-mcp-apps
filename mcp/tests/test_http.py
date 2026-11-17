@@ -48,10 +48,10 @@ async def test_discovery_and_tool_call_return_single_json_without_session(parque
         assert response.headers["content-type"].startswith("application/json")
         assert {tool["name"] for tool in response.json()["result"]["tools"]} == {
             "describe_dataset",
-            "search_office_market",
-            "aggregate_office_market",
+            "search_transactions",
+            "aggregate_transactions",
             "compare_values",
-            "show_office_market_dashboard",
+            "show_transaction_dashboard",
         }
         response = await client.post(
             "/mcp",
@@ -93,18 +93,18 @@ async def test_search_keeps_artifact_preview_and_model_content_separate(parquet,
             json=rpc(
                 "tools/call",
                 {
-                    "name": "search_office_market",
+                    "name": "search_transactions",
                     "arguments": {"limit": 200},
                 },
             ),
-            headers={"Mcp-Method": "tools/call", "Mcp-Name": "search_office_market"},
+            headers={"Mcp-Method": "tools/call", "Mcp-Name": "search_transactions"},
         )
         result = reply.json()["result"]
         summary = json.loads(result["content"][0]["text"])
         preview = result["structuredContent"]
         assert len(summary["sample_rows"]) == 3
         assert len(preview["preview_rows"]) == 20
-        assert summary["total_count"] == preview["total_count"] == 216
+        assert summary["total_count"] == preview["total_count"] == 360
         assert "preview_rows" not in json.dumps(result["content"])
         artifact = json.loads((tmp_path / "results" / f"{preview['result_id']}.json").read_text())
         assert len(artifact["rows"]) == 200
@@ -114,14 +114,14 @@ async def test_search_keeps_artifact_preview_and_model_content_separate(parquet,
             json=rpc(
                 "tools/call",
                 {
-                    "name": "aggregate_office_market",
-                    "arguments": {"area": "新宿区", "group_by": "year"},
+                    "name": "aggregate_transactions",
+                    "arguments": {"municipality": "新宿区", "group_by": "year"},
                 },
             ),
-            headers={"Mcp-Method": "tools/call", "Mcp-Name": "aggregate_office_market"},
+            headers={"Mcp-Method": "tools/call", "Mcp-Name": "aggregate_transactions"},
         )
         rows = reply.json()["result"]["structuredContent"]["preview_rows"]
-        assert [r["month_count"] for r in rows] == [12, 12, 12]
+        assert [r["transaction_count"] for r in rows] == [40, 40, 40]
 
 
 def test_missing_mcp_data_is_rejected_at_startup(tmp_path):
@@ -132,9 +132,8 @@ def test_missing_mcp_data_is_rejected_at_startup(tmp_path):
 @pytest.mark.parametrize(
     "name,arguments",
     [
-        ("search_office_market", {"limit": 201}),
-        ("search_office_market", {"month": 13}),
-        ("aggregate_office_market", {"group_by": "unknown"}),
+        ("search_transactions", {"limit": 201}),
+        ("aggregate_transactions", {"group_by": "unknown"}),
     ],
 )
 async def test_query_limits_and_group_allowlist_are_enforced_over_mcp(
@@ -159,7 +158,7 @@ async def test_app_discovery_resource_and_model_fallback(parquet, tmp_path):
                 "/mcp", json=rpc("tools/list", {}), headers={"Mcp-Method": "tools/list"}
             )
         ).json()["result"]["tools"]
-        app_tool = next(tool for tool in tools if tool["name"] == "show_office_market_dashboard")
+        app_tool = next(tool for tool in tools if tool["name"] == "show_transaction_dashboard")
         assert app_tool["_meta"]["ui"]["resourceUri"] == DASHBOARD_URI
         resource = (
             await client.post(
@@ -169,7 +168,7 @@ async def test_app_discovery_resource_and_model_fallback(parquet, tmp_path):
             )
         ).json()["result"]["contents"][0]
         assert resource["mimeType"] == "text/html;profile=mcp-app"
-        assert "オフィス市況のダッシュボード" in resource["text"]
+        assert "取引データのダッシュボード" in resource["text"]
         assert "/* APP_SCRIPT */" not in resource["text"]
         assert "<script src=" not in resource["text"]
         assert resource["_meta"]["ui"]["csp"]["connectDomains"] == []
@@ -180,19 +179,19 @@ async def test_app_discovery_resource_and_model_fallback(parquet, tmp_path):
                 json=rpc(
                     "tools/call",
                     {
-                        "name": "show_office_market_dashboard",
-                        "arguments": {"group_by": "month", "area": "新宿区"},
+                        "name": "show_transaction_dashboard",
+                        "arguments": {"group_by": "quarter", "municipality": "新宿区"},
                     },
                 ),
-                headers={"Mcp-Method": "tools/call", "Mcp-Name": "show_office_market_dashboard"},
+                headers={"Mcp-Method": "tools/call", "Mcp-Name": "show_transaction_dashboard"},
             )
         ).json()["result"]
         summary = json.loads(result["content"][0]["text"])
-        assert summary["total_count"] == 12
+        assert summary["total_count"] == 4
         assert len(summary["sample_rows"]) == 3
         assert result["structuredContent"] == summary
-        assert len(result["_meta"]["preview"]["preview_rows"]) == 12
-        assert result["_meta"]["preview"]["group_by"] == "month"
+        assert len(result["_meta"]["preview"]["preview_rows"]) == 4
+        assert result["_meta"]["preview"]["group_by"] == "quarter"
         assert "preview_rows" not in result["content"][0]["text"]
 
 

@@ -11,7 +11,7 @@ const result = (value) => ({
   returned_count: 1,
   truncated: false,
   preview_truncated: false,
-  preview_rows: [{ area: value }],
+  preview_rows: [{ municipality: value }],
   app: {
     resourceUri: "ui://test/view",
     html: `<html>ui-only-${value}</html>`,
@@ -31,7 +31,7 @@ test("two runs keep both results and never resend UI previews to the model", asy
       const toolCallId = `tool-${input.runId}`;
       const events = [
         { type: "RUN_STARTED", threadId: input.threadId, runId: input.runId },
-        { type: "TOOL_CALL_START", toolCallId, toolCallName: "search_office_market" },
+        { type: "TOOL_CALL_START", toolCallId, toolCallName: "search_transactions" },
         { type: "TOOL_CALL_ARGS", toolCallId, delta: "{}" },
         { type: "TOOL_CALL_END", toolCallId },
         {
@@ -71,7 +71,7 @@ test("two runs keep both results and never resend UI previews to the model", asy
     ["新宿区を検索", "渋谷区も検索"],
   );
   assert.deepEqual(
-    history.map((run) => run.results[0].preview_rows[0].area),
+    history.map((run) => run.results[0].preview_rows[0].municipality),
     ["preview-only-1", "preview-only-2"],
   );
   assert.ok(history.every((run) => run.status === "success" && run.tools[0].status === "success"));
@@ -91,7 +91,7 @@ test("failed or stopped runs keep earlier and partial results", () => {
     subscriber.onRunStartedEvent({ ...context, event: { runId } });
     subscriber.onToolCallStartEvent({
       ...context,
-      event: { toolCallId: "tool", toolCallName: "search_office_market" },
+      event: { toolCallId: "tool", toolCallName: "search_transactions" },
     });
     subscriber.onCustomEvent({ ...context, event: { name: "data_result", value: result(runId) } });
     if (runId === "completed") {
@@ -110,7 +110,7 @@ test("failed or stopped runs keep earlier and partial results", () => {
     ["success", "error", "stopped"],
   );
   assert.deepEqual(
-    history.map((run) => run.results[0].preview_rows[0].area),
+    history.map((run) => run.results[0].preview_rows[0].municipality),
     ["completed", "failed", "stopped"],
   );
   assert.deepEqual(

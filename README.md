@@ -1,7 +1,6 @@
 # 構造化データ探索エージェント PoC
 
 自然言語で表形式データを検索・集計するPoC。
-対象は東京都心のオフィス市況（地区別・月次の平均空室率と平均賃料）。
 Strands AgentsがMCPの探索ツールを呼び、MCPサーバー内のDuckDBでParquetを読み取る。
 Next.jsのチャットに回答を逐次表示し、検索・集計結果を別のイベントで届ける。
 クラウドではAPI GatewayからWeb Adapter＋Next.jsのLambdaへ接続し、Next.jsがAgentCoreを呼び出す。
@@ -40,19 +39,8 @@ npm ci --ignore-scripts
 cd ..
 ```
 
-`prepare-sample` は架空の月次データ216行（6地区×2023〜2025年）を `mcp/data/office-market.parquet` に生成する。
-地区名は実在するが、空室率・賃料は架空であり、市況の判断には使えない。生成済みなら省略する。
-
-実データを使う場合は、公表元のサイトから東京ビジネス地区の月次Excel（地区別の平均空室率・平均賃料）を
-手動でダウンロードし、`mcp/` で次を実行する。同じパスのParquetを置き換える。
-
-```sh
-uv run --locked explore-mcp import-excel ダウンロードしたファイル.xlsx
-```
-
-表の形式（地区名・項目名・年月）を検査し、値と項目名は変更せずに格納する。
-プログラムによる自動取得は行わない。実データ（`mcp/data/`）はコミットしない。
-Parquetには合成か実データかの印を持たせ、ツール結果の `synthetic` で区別する。
+`prepare-sample` は架空の不動産取引360行を生成する。生成済みなら省略する。
+地域名は実在するが、価格・面積・時期は架空であり、市場価格の判断には使えない。
 
 ## チャットを起動する
 
@@ -83,7 +71,7 @@ npm run dev:sandbox
 ```
 
 <http://127.0.0.1:3000> を開く。終了は各ターミナルでCtrl+C。
-fixtureモードは千代田区の2023〜2025年の年別集計を実行する固定シナリオで、
+fixtureモードは新宿区の年別集計を実行する固定シナリオで、
 自然言語の理解やモデルの回答品質を検証するものではない。
 「ダッシュボード」または「グラフ」を含む質問では、MCP Apps表示用の固定シナリオに切り替わる。
 
@@ -112,14 +100,12 @@ Lambda用ZIPは `npm --prefix app run build:lambda`、エージェント・MCP�
 ECRスクリプトはダイジェストのJSONを更新する。配備は別途plan・applyで行う。
 
 探索・比較4ツールはMCPで公開する。MCP未接続時に利用できる通常のPythonツールはecho_textと、キー設定時のweb_search・web_fetch。
-加えて `show_office_market_dashboard` がMCP AppsのUIを提供する。構成と起動方法は [mcp/README.md](mcp/README.md) を参照。
+加えて `show_transaction_dashboard` がMCP AppsのUIを提供する。構成と起動方法は [mcp/README.md](mcp/README.md) を参照。
 クラウドのsandboxは専用API Gatewayの `/poc/sandbox` から配信する。
 チャットと同じNext.js Lambdaを共用し、別オリジンと同じ送信元IP制限を使う。
 URLはTerraformがLambdaへ自動設定する。配備は [TerraformのREADME](terraform/README.md#mcp-appsのsandbox配備) を参照。
 
-ローカルでは合成データと、手動で取得した実データのExcelを変換したParquetを使える。
-AgentCore向けイメージには合成データだけを含める。S3対応、チャットの認証・会話の永続化は未実装。
-実データを使うと、質問・ツール結果の要約（最大3行の抜粋を含む）が推論APIへ送られる。
+対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、SSMのキーでさくらを使用する。fixtureはローカル専用。
 結果はMCP側に最大200行を一時保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 

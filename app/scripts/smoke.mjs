@@ -39,8 +39,8 @@ agent.addMessage({
   id: crypto.randomUUID(),
   role: "user",
   content: apps
-    ? "千代田区の2023〜2025年の年別ダッシュボードを表示して"
-    : "項目を確認してから、千代田区の2023〜2025年を年別に集計し、平均空室率と平均賃料を教えて",
+    ? "新宿区の年別ダッシュボードを表示して"
+    : "項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて",
 });
 const started = performance.now();
 const observations = [];
@@ -68,23 +68,16 @@ assert.deepEqual(
   [2023, 2024, 2025],
 );
 assert.deepEqual(
-  data.preview_rows.map((row) => row.month_count),
-  [12, 12, 12],
+  data.preview_rows.map((row) => row.transaction_count),
+  [40, 40, 40],
 );
-// Values are fixed only for the synthetic file; an imported real file passes the checks above.
-if (data.synthetic) {
-  assert.deepEqual(
-    data.preview_rows.map((row) => row.mean_vacancy_rate_pct),
-    [1.55, 1.8, 2.05],
-  );
-  assert.deepEqual(
-    data.preview_rows.map((row) => row.mean_rent_yen_per_tsubo),
-    [21065, 21565, 22065],
-  );
-}
+assert.deepEqual(
+  data.preview_rows.map((row) => row.average_price_yen),
+  [42500000, 42500000, 42500000],
+);
 if (apps) {
   assert.equal(data.app?.mimeType, "text/html;profile=mcp-app");
-  assert.ok(data.app.html.includes("オフィス市況のダッシュボード"));
+  assert.ok(data.app.html.includes("取引データのダッシュボード"));
   assert.equal(data.app.toolResult._meta.preview.preview_rows.length, 3);
   McpUiToolResultNotificationSchema.parse({
     method: "ui/notifications/tool-result",
@@ -100,7 +93,7 @@ const text = agent.messages
   .filter((m) => m.role === "assistant")
   .map((m) => m.content ?? "")
   .join("");
-assert.ok(live ? !data.synthetic || text.includes("合成") : text.includes("固定シナリオ"));
+assert.ok(text.includes("合成データ"));
 const timing = (predicate) => observations.find((item) => predicate(item.event))?.elapsed_ms;
 const textEvents = observations.filter((item) => item.event.type === "TEXT_MESSAGE_CONTENT");
 // The fixture deliberately spaces chunks out. Real models may finish within 200ms.
