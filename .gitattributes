@@ -1,0 +1,2 @@
+# 取得したCSV（Shift_JIS・CRLF）を改変せずに保持する。
+mcp/source/*.csv -text -diff

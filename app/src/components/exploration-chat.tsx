@@ -34,6 +34,7 @@ const columnNames: Record<string, string> = {
   year: "年",
   municipality: "地域",
   quarter: "四半期",
+  property_type: "種類",
   transaction_id: "取引ID",
   transaction_count: "件数",
   average_price_yen: "平均取引総額（円）",
@@ -120,7 +121,7 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
             messageView={{ toolCallDisplay: "line", reasoningMessage: { header: ReasoningHeader } }}
             input={{ showDisclaimer: false }}
             labels={{
-              chatInputPlaceholder: "例：新宿区を年別に集計して、件数と平均取引総額を教えて",
+              chatInputPlaceholder: "例：品川区を年別に集計して、件数と平均取引総額を教えて",
               chatInputToolbarSendButtonLabel: "送信",
               chatInputToolbarStopButtonLabel: "停止",
               chatScrollToBottomLabel: "最新の回答へ",
@@ -316,7 +317,10 @@ export function ExplorationChat({ sandboxUrl }: { sandboxUrl?: string }) {
           )}
         </div>
       </header>
-      <div className="dataset-line">360件 · 千代田区 / 新宿区 / 渋谷区 · 2023–2025年</div>
+      <div className="dataset-line">
+        品川区 / 大田区 / 川崎市幸区 · 2023–2025年 · 出典：国土交通省
+        不動産情報ライブラリ（「不動産取引価格情報」をもとに加工して作成）
+      </div>
       {mode === "offline" && (
         <div className="error-banner" role="alert">
           エージェントに接続できません。接続先の状態を確認してから再読み込みしてください。

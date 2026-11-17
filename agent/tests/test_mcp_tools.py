@@ -40,15 +40,15 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     assert len(results) == 2
     assert all(result["source"] == "mcp" for result in results)
     assert results[0]["total_count"] == 3
-    assert results[0]["dataset"] == "synthetic-real-estate-v1"
-    assert results[0]["synthetic"] is True
+    assert results[0]["dataset"] == "mlit-transaction-prices-v1"
+    assert "国土交通省" in results[0]["attribution"]
     assert results[1]["source"] == "mcp"
     assert results[1]["preview_rows"] == [
         {
-            "baseline": 42_500_000,
-            "current": 42_500_000,
-            "difference": 0,
-            "percent_change": 0,
+            "baseline": 100,
+            "current": 120,
+            "difference": 20,
+            "percent_change": 20,
         }
     ]
     statuses = [event["value"]["status"] for event in events if event.get("name") == "tool_status"]
@@ -123,7 +123,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
     def handle(request):
         requests.append(json.loads(request.content))
         message = tool_message(
-            "show_transaction_dashboard", {"group_by": "quarter", "municipality": "新宿区"}
+            "show_transaction_dashboard", {"group_by": "quarter", "municipality": "品川区"}
         )
         if parallel:
             message["tool_calls"] += tool_message(
@@ -133,7 +133,7 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
             completion(message, "tool_calls")
             if len(requests) == 1
             else completion(
-                {"role": "assistant", "content": "合成データのグラフを表示しました。"}, "stop"
+                {"role": "assistant", "content": "取引データのグラフを表示しました。"}, "stop"
             )
         )
         return response(answer, not parallel)

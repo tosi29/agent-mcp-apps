@@ -12,10 +12,13 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse, PlainTextResponse
 
 from exploration_mcp.apps import dashboard_app
-from exploration_mcp.data import DataExplorer, Filters, prepare_sample
+from exploration_mcp.data import DataExplorer, Filters
 from exploration_mcp.observability import configure_observability
 from exploration_mcp.results import ResultStore
+from exploration_mcp.source import prepare_data
 from exploration_mcp.tools import register_tools
+
+DEFAULT_DATA = "data/transactions.parquet"
 
 
 class RejectBrowserOrigin:
@@ -35,9 +38,7 @@ def create_app(
     *, agentcore: bool = False, data_path: Path | None = None, results_dir: Path | None = None
 ):
     configure_observability()
-    explorer = DataExplorer(
-        data_path or Path(os.environ.get("MCP_DATA_PATH", "data/synthetic.parquet"))
-    )
+    explorer = DataExplorer(data_path or Path(os.environ.get("MCP_DATA_PATH", DEFAULT_DATA)))
     # Connections are closed before Runtime V2 can capture its startup snapshot.
     explorer.describe()
     default_results = "/tmp/results" if agentcore else "results"
@@ -79,26 +80,29 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="ローカルMCPツールサーバー")
     parser.add_argument("--port", type=int, default=8001)
     parser.add_argument(
-        "--data", type=Path, default=Path(os.environ.get("MCP_DATA_PATH", "data/synthetic.parquet"))
+        "--data", type=Path, default=Path(os.environ.get("MCP_DATA_PATH", DEFAULT_DATA))
     )
     parser.add_argument(
         "--results", type=Path, default=Path(os.environ.get("MCP_RESULTS_DIR", "results"))
     )
     commands = parser.add_subparsers(dest="command")
-    commands.add_parser("prepare-sample", help="合成Parquetを生成する（モデルAPI不要）")
+    prepare = commands.add_parser(
+        "prepare-data", help="source/のCSVから--dataのParquetを生成する（モデルAPI不要）"
+    )
+    prepare.add_argument("--source", type=Path, default=Path("source"))
     commands.add_parser("inspect", help="データ項目を確認する（モデルAPI不要）")
-    commands.add_parser("query-demo", help="新宿区を年別集計する（モデルAPI不要）")
+    commands.add_parser("query-demo", help="品川区を年別集計する（モデルAPI不要）")
     result = commands.add_parser("result", help="同じMCP環境の保存結果を読む（モデルAPI不要）")
     result.add_argument("result_id")
     args = parser.parse_args()
-    if args.command == "prepare-sample":
-        prepare_sample(args.data)
-        print(json.dumps({"row_count": 360, "path": str(args.data), "synthetic": True}))
+    if args.command == "prepare-data":
+        count = prepare_data(args.source, args.data)
+        print(json.dumps({"row_count": count, "path": str(args.data)}))
         return
     queries = {
         "result": lambda: ResultStore(args.results).get(args.result_id),
         "inspect": lambda: DataExplorer(args.data).describe(),
-        "query-demo": lambda: DataExplorer(args.data).aggregate("year", Filters("新宿区")),
+        "query-demo": lambda: DataExplorer(args.data).aggregate("year", Filters("品川区")),
     }
     if args.command:
         print(json.dumps(queries[args.command](), ensure_ascii=False, allow_nan=False))

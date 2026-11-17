@@ -68,7 +68,7 @@ def response(body, streaming):
             {"tool_calls": [{"index": 0, "function": {"arguments": args[middle:]}}]},
         ]
     else:
-        deltas = [{"content": "合成データの"}, {"content": "検索結果です。"}]
+        deltas = [{"content": "取引データの"}, {"content": "検索結果です。"}]
     if reasoning := message.get("reasoning_content"):
         middle = len(reasoning) // 2
         deltas = [
@@ -138,7 +138,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
             answer = completion(tool_message("search_transactions", {"limit": 200}), "tool_calls")
         else:
             answer = completion(
-                {"role": "assistant", "content": "合成データの検索結果です。"}, "stop"
+                {"role": "assistant", "content": "取引データの検索結果です。"}, "stop"
             )
         return response(answer, streaming)
 
@@ -149,7 +149,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
         http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
     ) as client:
         model = OpenAIModel(client=client, model_id="mock", stream=streaming)
-        events = await collect(model, "合成データを検索", mcp=local_target(mcp_url))
+        events = await collect(model, "取引データを検索", mcp=local_target(mcp_url))
     assert len(requests) == 3
     search_spec = next(
         item["function"]
@@ -164,7 +164,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     data = custom(events, "data_result")[0]
     assert data["tool_call_id"] == "call-search"
     assert len(data["preview_rows"]) == 20
-    assert data["total_count"] == 360
+    assert data["total_count"] == 4143
     artifact = json.loads((mcp_results / f"{data['result_id']}.json").read_text())
     assert len(artifact["rows"]) == 200
     model_result = next(
@@ -174,10 +174,10 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     assert "preview_rows" not in model_result["content"]
     projection = json.loads(model_result["content"])
     assert len(projection["sample_rows"]) == 3
-    assert projection["total_count"] == 360
+    assert projection["total_count"] == 4143
     assert projection["sample_truncated"] is True
     assert "rows" not in projection
-    assert "合成データの検索結果です。" == "".join(
+    assert "取引データの検索結果です。" == "".join(
         e["delta"] for e in events if e["type"] == "TEXT_MESSAGE_CONTENT"
     )
 

@@ -10,7 +10,7 @@ Browser → API Gateway Regional REST API /poc/（送信元IP制限）
           └─ IAM SigV4 → MCP用AgentCore Runtime V2 → DuckDB / Parquet
 ```
 
-Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
+Terraformは1.16.7、AWS providerは6.71.0に完全固定する（`versions.tf` は `=` 指定、CIと `.terraform-version` も同じ版）。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
 AWS認証は標準の認証情報チェーンを使用し、account ID変数は設けない。
 AgentCoreは常にParameter StoreのキーでさくらAPIを使用する。fixtureはローカル専用。
 Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
@@ -32,6 +32,34 @@ Amazon Linux 2023と、ルートの `.node-version` から読み取ったNode.js
 `.env` はDockerのコンテキストから除外し、ビルド中はAWS認証情報を渡さない。
 ブラウザ向けURLの接頭辞 `/poc` はビルド時に設定する。
 TerraformはビルドやECRへのpushを実行しない。LambdaはZIPのハッシュが変わった場合にコードを更新する。
+
+## state
+
+stateはS3バックエンドに置き、S3のロックファイル（`use_lockfile`）で排他する。DynamoDBは使わない。
+バケットは自身のstateを置くため、このTerraformの管理対象にせず、AWS CLIで事前に作成する。
+バケット名・キー・リージョンは `versions.tf` の `backend "s3"` を参照する。
+バケットはバージョニング、SSE-S3による既定の暗号化、パブリックアクセスブロック、HTTPS以外を拒否するバケットポリシー、
+90日経過した旧バージョンと7日経過した未完了のマルチパートアップロードを削除するライフサイクルルールを設定する。
+
+```sh
+BUCKET=agent-mcp-apps-tfstate-33415a34
+REGION=ap-northeast-1
+aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
+  --create-bucket-configuration LocationConstraint="$REGION"
+aws s3api put-bucket-tagging --bucket "$BUCKET" \
+  --tagging 'TagSet=[{Key=Project,Value=agent-mcp-apps}]'
+aws s3api put-public-access-block --bucket "$BUCKET" \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket "$BUCKET" \
+  --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"},"BucketKeyEnabled":true}]}'
+aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyInsecureTransport\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::$BUCKET\",\"arn:aws:s3:::$BUCKET/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}"
+aws s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" \
+  --lifecycle-configuration '{"Rules":[{"ID":"ExpireNoncurrentVersions","Status":"Enabled","Filter":{},"NoncurrentVersionExpiration":{"NoncurrentDays":90},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":7}}]}'
+```
+
+ローカルの `terraform.tfstate` から移す場合は、`terraform -chdir=terraform init -migrate-state` を実行し、
+`plan` で差分がないことを確認する。
 
 ## 初期セットアップ
 
@@ -143,7 +171,7 @@ terraform -chdir=terraform output -raw mcp_apps_sandbox_url
 ```
 
 planでAPI Gateway関連とLambda invoke permissionの追加、既存LambdaのZIP・環境変数更新を確認する。
-配備後は許可したIPからチャットを開き、「新宿区の年別ダッシュボードを表示して」で
+配備後は許可したIPからチャットを開き、「品川区の年別ダッシュボードを表示して」で
 iframe表示・指標切り替え・履歴の開閉を確認する。sandbox URLのHTTP確認だけでは描画確認にはならない。
 API Gateway・Lambda・AgentCoreの利用料金が発生し得る。
 
@@ -195,7 +223,7 @@ cd app
 SMOKE_URL="$WEB_URL" npm run smoke
 ```
 
-画面・静的ファイル・SSE・独立した結果イベント・合成データの期待値・正常終了を検査する。
+画面・静的ファイル・SSE・独立した結果イベント・品川区の年別集計の期待値・正常終了を検査する。
 ブラウザの描画確認は別途必要。Lambda、API Gateway、AgentCoreの利用料金は発生し得る。
 
 ## AgentCoreのログとテレメトリ

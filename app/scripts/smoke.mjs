@@ -39,8 +39,8 @@ agent.addMessage({
   id: crypto.randomUUID(),
   role: "user",
   content: apps
-    ? "新宿区の年別ダッシュボードを表示して"
-    : "項目を確認してから、新宿区を年別に集計し、件数と平均取引総額を教えて",
+    ? "品川区の年別ダッシュボードを表示して"
+    : "項目を確認してから、品川区を年別に集計し、件数と平均取引総額を教えて",
 });
 const started = performance.now();
 const observations = [];
@@ -69,11 +69,11 @@ assert.deepEqual(
 );
 assert.deepEqual(
   data.preview_rows.map((row) => row.transaction_count),
-  [40, 40, 40],
+  [359, 423, 408],
 );
 assert.deepEqual(
   data.preview_rows.map((row) => row.average_price_yen),
-  [42500000, 42500000, 42500000],
+  [166291086.35, 179074940.9, 197950980.39],
 );
 // The MCP resource_link reaches the UI only; the model's history must not contain it.
 const [download] = data.downloads ?? [];
@@ -110,7 +110,7 @@ const text = agent.messages
   .filter((m) => m.role === "assistant")
   .map((m) => m.content ?? "")
   .join("");
-assert.ok(text.includes("合成データ"));
+assert.ok(text.includes(live ? "国土交通省" : "固定シナリオ"));
 const timing = (predicate) => observations.find((item) => predicate(item.event))?.elapsed_ms;
 const textEvents = observations.filter((item) => item.event.type === "TEXT_MESSAGE_CONTENT");
 // The fixture deliberately spaces chunks out. Real models may finish within 200ms.

@@ -1,4 +1,4 @@
-FROM node:26.13.0-bookworm-slim AS ui
+FROM node:26.13.1-bookworm-slim AS ui
 WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
@@ -22,9 +22,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
+COPY source/ ./source/
 COPY --from=ui /src/exploration_mcp/ui/dashboard.html ./src/exploration_mcp/ui/dashboard.html
 RUN uv sync --locked --no-dev --no-editable \
-    && .venv/bin/explore-mcp prepare-sample
+    && .venv/bin/explore-mcp prepare-data
 
 USER 10001:10001
 EXPOSE 8000
