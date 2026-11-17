@@ -1,6 +1,7 @@
 # 構造化データ探索エージェント PoC
 
 自然言語で表形式データを検索・集計するPoC。
+対象は国土交通省の不動産取引価格情報（品川区・大田区・川崎市幸区、2023〜2025年）。
 Strands AgentsがMCPの探索ツールを呼び、MCPサーバー内のDuckDBでParquetを読み取る。
 Next.jsのチャットに回答を逐次表示し、検索・集計結果を別のイベントで届ける。
 クラウドではAPI GatewayからWeb Adapter＋Next.jsのLambdaへ接続し、Next.jsがAgentCoreを呼び出す。
@@ -31,7 +32,7 @@ npm --prefix mcp/ui ci --ignore-scripts
 npm --prefix mcp/ui run build
 cd mcp
 uv sync --locked
-uv run --locked explore-mcp prepare-sample
+uv run --locked explore-mcp prepare-data
 cd ../agent
 uv sync --locked
 cd ../app
@@ -39,8 +40,10 @@ npm ci --ignore-scripts
 cd ..
 ```
 
-`prepare-sample` は架空の不動産取引360行を生成する。生成済みなら省略する。
-地域名は実在するが、価格・面積・時期は架空であり、市場価格の判断には使えない。
+`prepare-data` は `mcp/source/` のCSV（4,143件）から `mcp/data/transactions.parquet` を生成する。
+CSVは改変せずにコミットしている。データの内容と出典は [mcp/README.md](mcp/README.md#データと出典) を参照。
+
+出典：[国土交通省 不動産情報ライブラリ](https://www.reinfolib.mlit.go.jp/)。「不動産取引価格情報」（国土交通省）をもとに本PoCで列の選択・変換を行って作成。
 
 ## チャットを起動する
 
@@ -71,7 +74,7 @@ npm run dev:sandbox
 ```
 
 <http://127.0.0.1:3000> を開く。終了は各ターミナルでCtrl+C。
-fixtureモードは新宿区の年別集計を実行する固定シナリオで、
+fixtureモードは品川区の年別集計を実行する固定シナリオで、
 自然言語の理解やモデルの回答品質を検証するものではない。
 「ダッシュボード」または「グラフ」を含む質問では、MCP Apps表示用の固定シナリオに切り替わる。
 
@@ -105,7 +108,8 @@ ECRスクリプトはダイジェストのJSONを更新する。配備は別途p
 チャットと同じNext.js Lambdaを共用し、別オリジンと同じ送信元IP制限を使う。
 URLはTerraformがLambdaへ自動設定する。配備は [TerraformのREADME](terraform/README.md#mcp-appsのsandbox配備) を参照。
 
-対象は合成Parquet。実データ取り込み、S3対応、チャットの認証・会話の永続化は未実装。
+対象は `mcp/source/` のCSVから生成したParquet。データの追加・更新の自動化、S3対応、チャットの認証・会話の永続化は未実装。
+質問・ツール結果の要約（最大3行の抜粋を含む）は推論APIへ送られる。
 モデルから任意SQLは受け付けない。AWSでは送信元IPを制限し、SSMのキーでさくらを使用する。fixtureはローカル専用。
 結果はMCP側に最大200行を一時保存し、画面へ最大20行、LLMへ最大3行のサンプルを渡す。
 
