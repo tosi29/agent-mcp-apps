@@ -10,7 +10,7 @@ Browser → API Gateway Regional REST API /poc/（送信元IP制限）
           └─ IAM SigV4 → MCP用AgentCore Runtime V2 → DuckDB / Parquet
 ```
 
-Terraformは1.9.7、AWS providerは6.71.0に固定する。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
+Terraformは1.16.7、AWS providerは6.71.0に完全固定する（`versions.tf` は `=` 指定、CIと `.terraform-version` も同じ版）。Web Adapterは1.1.0の公式ARM64 Layer（version 30）を使う。
 AWS認証は標準の認証情報チェーンを使用し、account ID変数は設けない。
 AgentCoreは常にParameter StoreのキーでさくらAPIを使用する。fixtureはローカル専用。
 Lambdaの実行ロールでAgentCoreを呼び、ブラウザにAWS認証情報は渡さない。
