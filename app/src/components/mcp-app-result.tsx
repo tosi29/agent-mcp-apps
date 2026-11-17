@@ -130,7 +130,7 @@ export function McpAppResultView({ app, sandboxUrl }: { app: McpAppResult; sandb
       )}
       <iframe
         ref={frame}
-        title="MCP App：取引ダッシュボード"
+        title="MCP App：オフィス市況ダッシュボード"
         sandbox="allow-scripts allow-same-origin"
         referrerPolicy="origin"
         className="mcp-app-frame"
