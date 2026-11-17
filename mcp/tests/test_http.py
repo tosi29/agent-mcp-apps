@@ -263,7 +263,7 @@ async def test_result_tools_link_csv_resource_readable_on_same_server(parquet, t
         assert [t["uriTemplate"] for t in templates] == [CSV_URI_TEMPLATE]
         for name, arguments, count in [
             ("search_transactions", {"limit": 200}, 200),
-            ("aggregate_transactions", {"group_by": "year", "municipality": "新宿区"}, 3),
+            ("aggregate_transactions", {"group_by": "year", "municipality": "品川区"}, 3),
             ("compare_values", {"baseline": 100, "current": 120}, 1),
             ("show_transaction_dashboard", {"group_by": "municipality"}, 3),
         ]:

@@ -41,7 +41,10 @@ def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore
         CSV_URI_TEMPLATE,
         name="result-csv",
         title="保存した結果のCSV",
-        description="検索・集計・比較ツールが保存した結果（最大200行・合成データ）をCSVで返す。",
+        description=(
+            "検索・集計・比較ツールが保存した結果（最大200行）をCSVで返す。"
+            "出典は国土交通省 不動産情報ライブラリ。"
+        ),
         mime_type=CSV_MIME,
     )
     async def result_csv(result_id: str) -> str:

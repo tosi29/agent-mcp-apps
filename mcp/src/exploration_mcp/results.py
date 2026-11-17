@@ -69,7 +69,7 @@ def csv_link(preview: dict[str, Any]) -> ResourceLink:
     return ResourceLink(
         uri=CSV_URI_TEMPLATE.format(result_id=preview["result_id"]),
         name=f"result-{preview['result_id']}.csv",
-        title="保存した結果のCSV（合成データ）",
+        title="保存した結果のCSV（不動産取引価格情報を加工して作成）",
         description=(
             f"保存済みの{preview['returned_count']}行。"
             "同じMCPサーバーでresources/readすると取得できる一時ファイル。"
