@@ -83,7 +83,7 @@ const csv = await fetch(`${origin}/api/resources?${new URLSearchParams({ uri: do
 // AgentCore cannot read a result back from the MCP session that saved it.
 const csvDownload = csv.status === 501 ? "unsupported" : "ok";
 if (csvDownload === "ok" || !process.env.SMOKE_URL) {
-  assert.equal(csv.status, 200, "CSV download through the agent backend failed");
+  assert.equal(csv.status, 200, "CSV download through MCP resources/read failed");
   assert.match(csv.headers.get("content-disposition") ?? "", /^attachment; filename="result-/);
   const lines = (await csv.text())
     .replace(/^\uFEFF/, "")
