@@ -48,6 +48,12 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     ]
     statuses = [event["value"]["status"] for event in events if event.get("name") == "tool_status"]
     assert statuses == ["success"] * 3
+    # Each result carries the MCP resource_link for the UI, not for the model.
+    for result in results:
+        [download] = result["downloads"]
+        assert download["uri"] == f"exploration://results/{result['result_id']}.csv"
+    tool_results = json.dumps([e for e in events if e["type"] == "TOOL_CALL_RESULT"])
+    assert "exploration://" not in tool_results
 
 
 async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
@@ -90,6 +96,7 @@ async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):
     assert summary["percent_change"] == 20
     assert "preview_rows" not in json.dumps(requests)
     assert "result_id" not in json.dumps(requests)
+    assert "exploration://" not in json.dumps(requests)
 
 
 @pytest.mark.parametrize("parallel", [False, True])

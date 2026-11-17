@@ -21,6 +21,7 @@
     "@aws-sdk/client-bedrock-agentcore-control": "3.1161.0",
     "@copilotkit/react-core": "1.83.0",
     "@copilotkit/runtime": "1.83.0",
+    "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/ext-apps": "2.0.4",
     "next": "16.4.5",
     "react": "19.3.1",

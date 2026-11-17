@@ -76,7 +76,7 @@ src/exploration_agent/
 ├── observability.py     # ログ・トレース・メトリクス
 ├── entrypoints/         # 起動の入口：server（AG-UI）、agentcore
 ├── tools/               # 通常のPythonツール：echo、web（web_search・web_fetch）
-└── mcp_clients/         # MCPへの接続：target（接続先の検証）、exploration、apps、docs、agentcore（SigV4署名）
+└── mcp_clients/         # MCPへの接続：target（接続先の検証）、exploration、resources（リソース取得）、apps、docs、agentcore（SigV4署名）
 ```
 
 ## Web検索（Tavily）
@@ -135,6 +135,14 @@ UIが必要になったときだけ、Apps capabilityを明示した別のリソ
 同じrun内ではHTMLを再利用する。取得するのはコードで固定した `ui://` リソース1つだけ。
 HTML・ツール引数・UI専用結果は `data_result.app` に載せ、会話メッセージへコピーしない。
 任意SQLを受け付けず、列・集計・条件値の制御はMCP側で行う。
+
+### 結果CSVへのリンク
+
+MCPの結果ツールは、保存結果CSVへの `resource_link` を返す。
+Strandsの標準処理はこの型を破棄するため、`ExplorationMCPClient` が変換時に保持する。
+`ToolResultHook` はリンクをモデル向けの内容から取り除き、`data_result.downloads` に載せる。
+転送するのは `exploration://results/{32桁の16進数}.csv` かつ `text/csv` のリンクだけ。
+エージェントはCSVを読まない。取得は画面のサーバー側が行う（[appのREADME](../app/README.md#結果csvのダウンロード)）。
 
 推論テキストはAG-UIの `REASONING_*` で渡し、CopilotKitの開閉表示を使う。
 次の質問の `reasoning` メッセージはモデル入力から除外する。

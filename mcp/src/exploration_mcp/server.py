@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from exploration_mcp.apps import dashboard_app
 from exploration_mcp.data import DataExplorer, Filters
 from exploration_mcp.observability import configure_observability
-from exploration_mcp.results import ResultStore
+from exploration_mcp.results import ResultStore, S3ResultStore
 from exploration_mcp.source import prepare_data
 from exploration_mcp.tools import register_tools
 
@@ -34,6 +34,14 @@ class RejectBrowserOrigin:
         await self.app(scope, receive, send)
 
 
+def result_store(results_dir: Path | None, *, agentcore: bool) -> ResultStore:
+    # A shared bucket lets later connections (other AgentCore sessions) read saved results.
+    if bucket := os.environ.get("MCP_RESULTS_BUCKET"):
+        return S3ResultStore(bucket)
+    default = "/tmp/results" if agentcore else "results"
+    return ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default)))
+
+
 def create_app(
     *, agentcore: bool = False, data_path: Path | None = None, results_dir: Path | None = None
 ):
@@ -41,8 +49,7 @@ def create_app(
     explorer = DataExplorer(data_path or Path(os.environ.get("MCP_DATA_PATH", DEFAULT_DATA)))
     # Connections are closed before Runtime V2 can capture its startup snapshot.
     explorer.describe()
-    default_results = "/tmp/results" if agentcore else "results"
-    store = ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
+    store = result_store(results_dir, agentcore=agentcore)
     server = MCPServer(
         "exploration-tools",
         subscriptions=False,

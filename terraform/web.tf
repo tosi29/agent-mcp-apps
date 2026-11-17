@@ -72,6 +72,24 @@ resource "aws_iam_role_policy" "web" {
   })
 }
 
+resource "aws_iam_role_policy" "web_mcp" {
+  count = var.mcp_image_digest != null ? length(aws_iam_role.web) : 0
+
+  name = "read_mcp_result_resources"
+  role = aws_iam_role.web[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = ["bedrock-agentcore:InvokeAgentRuntime"]
+      Resource = [
+        aws_bedrockagentcore_agent_runtime.mcp[0].agent_runtime_arn,
+        "${aws_bedrockagentcore_agent_runtime.mcp[0].agent_runtime_arn}/runtime-endpoint/DEFAULT"
+      ]
+    }]
+  })
+}
+
 resource "aws_lambda_function" "web" {
   count = length(aws_bedrockagentcore_agent_runtime.agent)
 
@@ -88,7 +106,7 @@ resource "aws_lambda_function" "web" {
   timeout          = 330
 
   environment {
-    variables = {
+    variables = merge({
       AGENT_RUNTIME_ARN                      = one(aws_bedrockagentcore_agent_runtime.agent[*].agent_runtime_arn)
       APP_ORIGIN                             = "https://${aws_api_gateway_rest_api.agent[0].id}.execute-api.ap-northeast-1.amazonaws.com"
       MCP_APPS_SANDBOX_URL                   = local.sandbox_url
@@ -103,7 +121,10 @@ resource "aws_lambda_function" "web" {
       COPILOTKIT_TELEMETRY_DISABLED          = "true"
       DO_NOT_TRACK                           = "1"
       RUST_LOG                               = "warn"
-    }
+      }, var.mcp_image_digest != null ? {
+      # The app reads result CSVs with MCP resources/read; it never calls MCP tools.
+      MCP_RUNTIME_ARN = aws_bedrockagentcore_agent_runtime.mcp[0].agent_runtime_arn
+    } : {})
   }
 
   lifecycle {
@@ -113,7 +134,7 @@ resource "aws_lambda_function" "web" {
     }
   }
 
-  depends_on = [aws_iam_role_policy.web]
+  depends_on = [aws_iam_role_policy.web, aws_iam_role_policy.web_mcp]
 }
 
 resource "aws_api_gateway_rest_api" "agent" {

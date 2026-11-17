@@ -71,6 +71,9 @@ AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN`
 東京リージョンのRuntimeに接続し、AWS認証は標準チェーンを使う。Lambdaでは実行ロールから取得する。
 `InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。AgentCore接続時の接続モードは常に `sakura` とする。
 
+結果CSVを読むMCPサーバーは `MCP_URL` で指定する。既定値は `http://127.0.0.1:8001/mcp` で、ループバックのHTTPだけを許可する。
+AgentCoreのMCPを使う場合は `MCP_RUNTIME_ARN` を設定する（`MCP_URL` より優先）。`InvokeAgentRuntime` の権限が必要。
+
 ## MCP Appsの表示
 
 「品川区の年別ダッシュボードを表示して」と質問すると、MCPが提供するHTMLを右ペインに表示する。
@@ -125,6 +128,7 @@ JS/CSSには `assetPrefix`、画面内のAPI・ホームURLには `appPath()` �
 
 - 回答文が逐次表示され、完了後に再び送信できる。
 - ツールの実行状況と、回答文から独立した結果表が右側に表示される。
+- 各結果の「CSVをダウンロード」で、MCPに保存された結果（最大200行）をCSVで保存できる。ローカル起動だけで対応。
 - 続けて質問すると、前の結果を残したまま新しい結果が下へ追加される。過去の結果を読んでいる間はスクロール位置を維持する。
 - 品川区の年別集計は2023〜2025年の3行で、件数は359・423・408件。
 - 停止・エラー表示と、狭い画面での入力・表の横スクロールを確認する。
@@ -157,7 +161,7 @@ SMOKE_URL=https://example.execute-api.ap-northeast-1.amazonaws.com/poc/ npm run 
 ```
 
 Next.js RuntimeからPythonツールまでを通し、静的ファイルの取得、ストリーム、独立した結果イベント、
-品川区の年別集計の期待値、正常終端、テレメトリ無効設定を検査する。
+品川区の年別集計の期待値、正常終端、テレメトリ無効設定、結果CSVのリンクと取得を検査する。
 ブラウザ描画とモデルの推論品質は対象外。
 
 実APIで同じ経路を試す場合は、Pythonをさくらモードで起動して明示的に指定する。
@@ -179,7 +183,7 @@ AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用す
 
 | name | 用途 |
 | --- | --- |
-| `data_result` | result_id / tool_call_id、件数、最大20行のプレビュー |
+| `data_result` | result_id / tool_call_id、件数、最大20行のプレビュー、結果CSVへのリンク（`downloads`） |
 | `tool_status` | ツール実行の成功・失敗 |
 
 `TOOL_CALL_END` は引数生成の終端で、実行完了は `tool_status` で扱う。
@@ -187,6 +191,20 @@ AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用す
 画面の結果履歴はリロードでリセットする。実行失敗・中断時も、それまでに取得した結果は残す。
 後続の質問で会話を再送するときも、画面用プレビューをモデルへ送り直さない。
 モデルへ返すツール結果は件数・最大3行のサンプル・参照ID。
+
+### 結果CSVのダウンロード
+
+`downloads` はMCPの `resource_link` で、画面はURIだけを保持する。
+ボタンを押すと `GET /api/resources?uri=...` を呼び、Next.jsのサーバー側がMCPクライアントとして `resources/read` を送る。
+エージェントとモデルは経由しない。ブラウザはMCPへ直接接続しない。
+
+- URIは結果CSVの形式に限る。送り先は `MCP_RUNTIME_ARN` または `MCP_URL` の固定サーバーで、URIから決めない。
+- UTF-8のBOMを付けて添付ファイルとして返し、キャッシュしない。不明・期限切れの結果は404で、理由を区別しない。
+- AgentCoreでは、MCPのStreamable HTTPの各POSTを `InvokeAgentRuntime`（IAM署名）で送る。新しいMCPセッションで接続し、結果はMCPがS3から読む。
+- 新しいセッションはMCPのmicroVMを起動するため、初回は数秒かかる場合がある。接続・取得の上限は各30秒。
+
+利用者の認証を導入する場合は、MCP宛ての利用者トークン（OBO等で取得）で接続する。ローカルはMCPクライアントの `authProvider`、AgentCoreはRuntimeのOAuth受け付けに切り替える。
+MCP側では、保存時と読み出し時の主体を照合する。URIは推測できないIDだけで構成し、読めるかどうかは認証で決める。
 
 会話はInMemoryAgentRunnerに一時保持する。上限は10スレッド、各5run、保持済みイベント約8MB。
 実行中イベント全体の厳密なメモリ上限ではない。

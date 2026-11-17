@@ -75,6 +75,19 @@ assert.deepEqual(
   data.preview_rows.map((row) => row.average_price_yen),
   [166291086.35, 179074940.9, 197950980.39],
 );
+// The MCP resource_link reaches the UI only; the model's history must not contain it.
+const [download] = data.downloads;
+assert.match(download.uri, /^exploration:\/\/results\/[0-9a-f]{32}\.csv$/);
+assert.ok(!JSON.stringify(agent.messages).includes("exploration://"));
+const csv = await fetch(`${origin}/api/resources?${new URLSearchParams({ uri: download.uri })}`);
+assert.equal(csv.status, 200, "CSV download through MCP resources/read failed");
+assert.equal(csv.headers.get("content-disposition"), `attachment; filename="${download.name}"`);
+const csvLines = (await csv.text())
+  .replace(/^\uFEFF/, "")
+  .trim()
+  .split("\r\n");
+assert.ok(csvLines[0].startsWith("year,transaction_count,"));
+assert.equal(csvLines.length, 4);
 if (apps) {
   assert.equal(data.app?.mimeType, "text/html;profile=mcp-app");
   assert.ok(data.app.html.includes("取引データのダッシュボード"));
@@ -144,6 +157,7 @@ const summary = {
   data_result_ms: timing((e) => e.type === "CUSTOM" && e.name === "data_result"),
   done_ms: observations.at(-1).elapsed_ms,
   dataset: data.dataset,
+  csv_rows: csvLines.length - 1,
   note: "Next.js Runtime / AG-UI transport check; browser rendering not verified",
 };
 await mkdir("../agent/results", { recursive: true });
