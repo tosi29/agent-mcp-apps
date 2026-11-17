@@ -55,6 +55,7 @@
 - 最新版という理由だけで依存を個別に更新しない。CopilotKitとAG-UIクライアントの組み合わせ等、互換性を確認する。
 - SDKやクラウド機能のAPI名・対応範囲は、採用バージョンの公式仕様・型定義・実コードで確認する。
 - 採用バージョンはmanifestとlockファイルを参照する。このファイルへ重複して固定しない。
+- Terraform本体とproviderは `terraform/versions.tf` で `=` により完全固定する。Terraformの版を変える場合は `.terraform-version` とCIの `terraform_version` も揃える。
 
 ## ドキュメントの役割
 
