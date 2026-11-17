@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import boto3
+from botocore.exceptions import ClientError
 from mcp.types import ResourceLink
 
 CSV_URI_TEMPLATE = "exploration://results/{result_id}.csv"
@@ -17,15 +19,23 @@ _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
 class ResultStore:
+    """Local files. Readable only by the same process host, e.g. one AgentCore session."""
+
     def __init__(self, directory: Path):
         self.directory = directory
 
-    def put(self, result: dict[str, Any]) -> dict[str, Any]:
+    def _write(self, result_id: str, body: bytes) -> None:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with (self.directory / f"{result_id}.json").open("xb") as output:
+            output.write(body)
+
+    def _read(self, result_id: str) -> bytes:
+        return (self.directory / f"{result_id}.json").read_bytes()
+
+    def put(self, result: dict[str, Any]) -> dict[str, Any]:
         result_id = uuid4().hex
-        path = self.directory / f"{result_id}.json"
-        with path.open("x", encoding="utf-8") as output:
-            json.dump(result, output, ensure_ascii=False, allow_nan=False)
+        body = json.dumps(result, ensure_ascii=False, allow_nan=False).encode()
+        self._write(result_id, body)
         rows = result["rows"]
         metadata = {k: v for k, v in result.items() if k != "rows"}
         return {
@@ -38,7 +48,7 @@ class ResultStore:
     def get(self, result_id: str) -> dict[str, Any]:
         if not re.fullmatch(r"[0-9a-f]{32}", result_id):
             raise ValueError("invalid result_id")
-        return json.loads((self.directory / f"{result_id}.json").read_text(encoding="utf-8"))
+        return json.loads(self._read(result_id))
 
     def get_csv(self, result_id: str) -> str:
         """The stored rows (at most 200) as RFC 4180 CSV. Raises KeyError if unknown."""
@@ -47,6 +57,38 @@ class ResultStore:
         except (ValueError, FileNotFoundError) as error:
             raise KeyError(result_id) from error
         return to_csv(result["rows"])
+
+
+class S3ResultStore(ResultStore):
+    """Shared across AgentCore sessions, so any later connection can read a result."""
+
+    def __init__(self, bucket: str, prefix: str = "results/"):
+        self.bucket = bucket
+        self.prefix = prefix
+
+    def _client(self):
+        # Created per call: Runtime V2 must not capture credentials in its startup snapshot.
+        return boto3.client("s3", region_name="ap-northeast-1")
+
+    def _write(self, result_id: str, body: bytes) -> None:
+        self._client().put_object(
+            Bucket=self.bucket,
+            Key=f"{self.prefix}{result_id}.json",
+            Body=body,
+            ContentType="application/json",
+            IfNoneMatch="*",
+        )
+
+    def _read(self, result_id: str) -> bytes:
+        try:
+            response = self._client().get_object(
+                Bucket=self.bucket, Key=f"{self.prefix}{result_id}.json"
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"NoSuchKey", "404"}:
+                raise FileNotFoundError(result_id) from error
+            raise
+        return response["Body"].read()
 
 
 def _cell(value: Any) -> Any:

@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse, PlainTextResponse
 from exploration_mcp.apps import dashboard_app
 from exploration_mcp.data import DataExplorer, Filters
 from exploration_mcp.observability import configure_observability
-from exploration_mcp.results import ResultStore
+from exploration_mcp.results import ResultStore, S3ResultStore
 from exploration_mcp.source import prepare_data
 from exploration_mcp.tools import register_tools
 
@@ -42,7 +42,13 @@ def create_app(
     # Connections are closed before Runtime V2 can capture its startup snapshot.
     explorer.describe()
     default_results = "/tmp/results" if agentcore else "results"
-    store = ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
+    bucket = os.environ.get("MCP_RESULTS_BUCKET")
+    # A shared bucket lets later connections (other AgentCore sessions) read saved results.
+    store = (
+        S3ResultStore(bucket)
+        if bucket and results_dir is None
+        else ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
+    )
     server = MCPServer(
         "exploration-tools",
         subscriptions=False,
