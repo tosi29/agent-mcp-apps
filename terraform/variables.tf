@@ -9,6 +9,17 @@ variable "mcp_image_digest" {
   }
 }
 
+variable "results_retention_days" {
+  description = "MCPが保存した検索・集計結果をS3に残す日数。期限後はCSVのダウンロードもできなくなる。"
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.results_retention_days >= 1 && floor(var.results_retention_days) == var.results_retention_days
+    error_message = "results_retention_daysには1以上の整数を指定してください。"
+  }
+}
+
 variable "agent_image_digest" {
   description = "ECRにpushしたARM64エージェントイメージのsha256ダイジェスト。未指定ならECRとIAMだけを作成する。"
   type        = string

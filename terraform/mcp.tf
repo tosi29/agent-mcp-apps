@@ -13,6 +13,70 @@ resource "aws_ecr_repository" "mcp" {
   }
 }
 
+# Saved tool results, shared by every MCP session so a later resources/read can find them.
+# Only the MCP execution role reads or writes it; clients go through MCP, never to S3.
+resource "aws_s3_bucket" "results" {
+  bucket_prefix = "agent-mcp-apps-results-"
+  force_destroy = false
+}
+
+resource "aws_s3_bucket_public_access_block" "results" {
+  bucket                  = aws_s3_bucket.results.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "results" {
+  bucket = aws_s3_bucket.results.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "results" {
+  bucket = aws_s3_bucket.results.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "results" {
+  bucket = aws_s3_bucket.results.id
+  rule {
+    id     = "expire-results"
+    status = "Enabled"
+    filter {
+      prefix = "results/"
+    }
+    expiration {
+      days = var.results_retention_days
+    }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "results" {
+  bucket = aws_s3_bucket.results.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.results.arn, "${aws_s3_bucket.results.arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
+  depends_on = [aws_s3_bucket_public_access_block.results]
+}
+
 resource "aws_iam_role" "mcp" {
   name = "${local.mcp_name}_runtime"
   assume_role_policy = jsonencode({
@@ -30,7 +94,7 @@ resource "aws_iam_role" "mcp" {
 }
 
 resource "aws_iam_role_policy" "mcp" {
-  name = "runtime_image_and_logs"
+  name = "runtime_image_logs_and_results"
   role = aws_iam_role.mcp.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -44,6 +108,11 @@ resource "aws_iam_role_policy" "mcp" {
         Effect   = "Allow"
         Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
         Resource = aws_ecr_repository.mcp.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = "${aws_s3_bucket.results.arn}/results/*"
       },
       {
         Effect   = "Allow"
@@ -88,7 +157,8 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp" {
   role_arn           = aws_iam_role.mcp.arn
   platform_version   = "V2"
   environment_variables = merge(local.runtime_observability, {
-    OTEL_SERVICE_NAME = local.mcp_name
+    OTEL_SERVICE_NAME  = local.mcp_name
+    MCP_RESULTS_BUCKET = aws_s3_bucket.results.id
   })
 
   agent_runtime_artifact {
