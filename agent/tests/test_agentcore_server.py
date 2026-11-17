@@ -68,3 +68,5 @@ def test_agentcore_mcp_configuration_is_lazy(tmp_path, monkeypatch):
     monkeypatch.setattr(agentcore_server, "create_app", capture)
     assert create_agentcore_app() == "app"
     assert captured["mcp"].url == runtime_url(arn)
+    # The CSV link route is local only; AgentCore cannot reach the saving MCP session later.
+    assert captured["result_downloads"] is False

@@ -8,7 +8,8 @@ from typing import Any
 from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 
 from exploration_agent.mcp_clients.apps import APP_TOOL
-from exploration_agent.mcp_clients.exploration import RESULT_TOOLS
+from exploration_agent.mcp_clients.exploration import RESOURCE_LINK_KEY, RESULT_TOOLS
+from exploration_agent.mcp_clients.resources import RESULT_CSV_MIME, RESULT_CSV_URI
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,14 @@ class ToolResultHook(HookProvider):
         self.statuses[tool_call_id] = {"tool_call_id": tool_call_id, "name": name, "status": status}
         structured = event.result.pop("structuredContent", None)
         metadata = event.result.pop("metadata", None)
+        links = _pop_resource_links(event.result)
         if name in RESULT_TOOLS and status == "success":
             preview = await self._preview(event, structured, metadata)
-            self.previews[tool_call_id] = {**preview, "tool_call_id": tool_call_id}
+            self.previews[tool_call_id] = {
+                **preview,
+                "tool_call_id": tool_call_id,
+                "downloads": _csv_downloads(links),
+            }
         logger.info("tool_end %s", event.result)
 
     async def _preview(self, event: AfterToolCallEvent, structured: Any, metadata: Any) -> dict:
@@ -62,3 +68,30 @@ class ToolResultHook(HookProvider):
             },
         }
         return {**preview, "app": app}
+
+
+def _pop_resource_links(result: Any) -> list[dict]:
+    """Links are references for the client. The model keeps the text summary only."""
+    content = result.get("content", [])
+    links = [
+        block["json"][RESOURCE_LINK_KEY]
+        for block in content
+        if isinstance(block.get("json"), dict) and RESOURCE_LINK_KEY in block["json"]
+    ]
+    result["content"] = [
+        block
+        for block in content
+        if not (isinstance(block.get("json"), dict) and RESOURCE_LINK_KEY in block["json"])
+    ]
+    return links
+
+
+def _csv_downloads(links: list[dict]) -> list[dict]:
+    # Forward only the result CSV template; the UI must not follow arbitrary MCP URIs.
+    return [
+        {"uri": link["uri"], "title": str(link.get("title") or "CSV"), "mimeType": RESULT_CSV_MIME}
+        for link in links
+        if isinstance(link.get("uri"), str)
+        and RESULT_CSV_URI.fullmatch(link["uri"])
+        and link.get("mimeType") == RESULT_CSV_MIME
+    ]
