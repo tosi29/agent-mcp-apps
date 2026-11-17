@@ -12,6 +12,7 @@
 - Terraformには有効・無効を切り替える条件分岐を新たに足さない。新しいリソースは常に作成し、値は変数の既定値で与える。`terraform test` のテストは書かない。
 - 画面とPythonの接続はAG-UI。統合には `ag-ui-strands` を使い、HTTPエンドポイントは標準の `add_strands_fastapi_endpoint` に任せる。
 - MCP Serverは `mcp/` に分け、エージェントから接続する。項目確認・検索・集計・比較はMCP側へ集約する。データ探索のツールをPython側へ増やさない。
+- 例外として、画面のサーバー側は `resource_link` で渡された結果CSVに限り、MCPへ直接 `resources/read` を送る。画面からツールは呼ばない。
 - クラウドのsandbox配備や構成の重要な変更は相談する。sandboxは同じ送信元IP制限と別オリジンを維持し、HTML・中継処理はローカルproxyと共用して、起動・ビルドスクリプトを増やさない。
 - `app/` を変更するときは、同ディレクトリの `AGENTS.md` も読む。Next.jsが生成する指示ブロックを保持する。
 
