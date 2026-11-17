@@ -10,7 +10,6 @@ from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider,
 from exploration_agent.mcp_clients.apps import APP_TOOL
 from exploration_agent.mcp_clients.exploration import (
     RESOURCE_LINK_KEY,
-    RESULT_CSV_MIME,
     RESULT_CSV_URI,
     RESULT_TOOLS,
 )
@@ -74,28 +73,22 @@ class ToolResultHook(HookProvider):
         return {**preview, "app": app}
 
 
+def _resource_link(block: dict) -> dict | None:
+    data = block.get("json")  # Other tools may return any JSON here.
+    return data.get(RESOURCE_LINK_KEY) if isinstance(data, dict) else None
+
+
 def _pop_resource_links(result: Any) -> list[dict]:
     """Links are references for the client. The model keeps the text summary only."""
     content = result.get("content", [])
-    links = [
-        block["json"][RESOURCE_LINK_KEY]
-        for block in content
-        if isinstance(block.get("json"), dict) and RESOURCE_LINK_KEY in block["json"]
-    ]
-    result["content"] = [
-        block
-        for block in content
-        if not (isinstance(block.get("json"), dict) and RESOURCE_LINK_KEY in block["json"])
-    ]
-    return links
+    result["content"] = [block for block in content if _resource_link(block) is None]
+    return [link for block in content if (link := _resource_link(block)) is not None]
 
 
 def _csv_downloads(links: list[dict]) -> list[dict]:
     # Forward only the result CSV template; the UI must not follow arbitrary MCP URIs.
     return [
-        {"uri": link["uri"], "title": str(link.get("title") or "CSV"), "mimeType": RESULT_CSV_MIME}
+        {"uri": link["uri"], "name": link["name"], "title": link.get("title", "")}
         for link in links
-        if isinstance(link.get("uri"), str)
-        and RESULT_CSV_URI.fullmatch(link["uri"])
-        and link.get("mimeType") == RESULT_CSV_MIME
+        if RESULT_CSV_URI.fullmatch(link["uri"])
     ]

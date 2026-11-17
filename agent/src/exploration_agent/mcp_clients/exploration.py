@@ -22,7 +22,6 @@ RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values
 RESOURCE_LINK_KEY = "mcpResourceLink"
 # The only resource_link forwarded to the UI. The MCP server publishes this template.
 RESULT_CSV_URI = re.compile(r"exploration://results/[0-9a-f]{32}\.csv")
-RESULT_CSV_MIME = "text/csv"
 
 
 class ExplorationMCPClient(MCPClient):

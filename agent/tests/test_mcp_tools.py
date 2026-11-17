@@ -57,7 +57,7 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     for result in results:
         [download] = result["downloads"]
         assert RESULT_CSV_URI.fullmatch(download["uri"])
-        assert download["mimeType"] == "text/csv"
+        assert download["name"] == f"result-{result['result_id']}.csv"
         assert result["result_id"] in download["uri"]
     tool_results = json.dumps([e for e in events if e["type"] == "TOOL_CALL_RESULT"])
     assert "exploration://" not in tool_results
