@@ -58,7 +58,7 @@ export async function readResultCsv(uri: string): Promise<string> {
       throw new ResourceUnavailableError();
     }
     const [contents] = result.contents;
-    if (!contents || !("text" in contents) || contents.mimeType?.split(";")[0] !== "text/csv") {
+    if (!("text" in contents)) {
       throw new Error("unexpected resource contents");
     }
     return contents.text;

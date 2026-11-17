@@ -23,7 +23,7 @@ export type DataResult = {
   preview_truncated: boolean;
   preview_rows: Row[];
   // MCP resource_links forwarded by the agent. Only the URI is held; rows are read on demand.
-  downloads?: ResultDownload[];
+  downloads: ResultDownload[];
   app?: McpAppResult;
 };
 export type ResultRun = {

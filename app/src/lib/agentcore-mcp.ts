@@ -48,14 +48,14 @@ export function mcpRuntimeFetch(arn: string, invoke: Invoke) {
       if (output.mcpProtocolVersion) {
         responseHeaders.set("mcp-protocol-version", output.mcpProtocolVersion);
       }
-      return new Response(status === 204 ? null : body, {
+      return new Response(body, {
         status,
         headers: responseHeaders,
       });
     } catch (error) {
       const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
         ?.httpStatusCode;
-      return new Response(null, { status: status && status >= 400 ? status : 502 });
+      return new Response(null, { status: status ?? 502 });
     }
   };
 }

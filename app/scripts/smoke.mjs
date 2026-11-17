@@ -76,12 +76,12 @@ assert.deepEqual(
   [166291086.35, 179074940.9, 197950980.39],
 );
 // The MCP resource_link reaches the UI only; the model's history must not contain it.
-const [download] = data.downloads ?? [];
-assert.match(download?.uri ?? "", /^exploration:\/\/results\/[0-9a-f]{32}\.csv$/);
+const [download] = data.downloads;
+assert.match(download.uri, /^exploration:\/\/results\/[0-9a-f]{32}\.csv$/);
 assert.ok(!JSON.stringify(agent.messages).includes("exploration://"));
 const csv = await fetch(`${origin}/api/resources?${new URLSearchParams({ uri: download.uri })}`);
 assert.equal(csv.status, 200, "CSV download through MCP resources/read failed");
-assert.match(csv.headers.get("content-disposition") ?? "", /^attachment; filename="result-/);
+assert.equal(csv.headers.get("content-disposition"), `attachment; filename="${download.name}"`);
 const csvLines = (await csv.text())
   .replace(/^\uFEFF/, "")
   .trim()
