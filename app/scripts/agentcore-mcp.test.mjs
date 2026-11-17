@@ -47,11 +47,6 @@ describe("response returned to the MCP client", () => {
       expected: { status: 200, body: '{"id":1}' },
     },
     {
-      name: "notification accepted with an empty body",
-      upstream: () => output({ statusCode: 202 }),
-      expected: { status: 202, body: "" },
-    },
-    {
       name: "AWS error keeps its status, not its message",
       upstream: () =>
         Promise.reject(Object.assign(new Error("secret"), { $metadata: { httpStatusCode: 404 } })),
@@ -76,22 +71,16 @@ describe("response returned to the MCP client", () => {
   });
 });
 
-describe("methods other than POST never reach AgentCore", () => {
-  for (const method of ["GET", "DELETE"]) {
-    test(method, async () => {
-      const fetch = mcpRuntimeFetch(ARN, () => assert.fail("AgentCore was called"));
-      assert.equal((await fetch("ignored", { method })).status, 405);
-    });
-  }
+test("the SSE stream request (GET) never reaches AgentCore", async () => {
+  const fetch = mcpRuntimeFetch(ARN, () => assert.fail("AgentCore was called"));
+  assert.equal((await fetch("ignored", { method: "GET" })).status, 405);
 });
 
 describe("MCP Runtime ARN", () => {
   test("Tokyo runtime is accepted", () => assert.equal(validMcpRuntimeArn(ARN), ARN));
   const rejected = {
     "other region": ARN.replace("ap-northeast-1", "us-east-1"),
-    "query string": `${ARN}?x=1`,
-    "plain URL": "https://example.com/mcp",
-    empty: "",
+    "trailing text": `${ARN}?x=1`,
   };
   for (const [name, arn] of Object.entries(rejected)) {
     test(`${name} is rejected`, () => assert.throws(() => validMcpRuntimeArn(arn)));

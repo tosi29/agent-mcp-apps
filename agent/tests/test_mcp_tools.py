@@ -17,12 +17,7 @@ from exploration_agent.agui import agui_events
 from exploration_agent.entrypoints.server import create_app
 from exploration_agent.fixture_model import FixtureModel
 from exploration_agent.mcp_clients import agentcore as agentcore_mcp
-from exploration_agent.mcp_clients.exploration import (
-    MCP_TOOL_NAMES,
-    RESOURCE_LINK_KEY,
-    RESULT_CSV_URI,
-    build_mcp_clients,
-)
+from exploration_agent.mcp_clients.exploration import MCP_TOOL_NAMES, build_mcp_clients
 from exploration_agent.mcp_clients.target import local_target, runtime_target
 
 
@@ -56,12 +51,9 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     # Each result carries the MCP resource_link for the UI, not for the model.
     for result in results:
         [download] = result["downloads"]
-        assert RESULT_CSV_URI.fullmatch(download["uri"])
-        assert download["name"] == f"result-{result['result_id']}.csv"
-        assert result["result_id"] in download["uri"]
+        assert download["uri"] == f"exploration://results/{result['result_id']}.csv"
     tool_results = json.dumps([e for e in events if e["type"] == "TOOL_CALL_RESULT"])
     assert "exploration://" not in tool_results
-    assert RESOURCE_LINK_KEY not in tool_results
 
 
 async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):

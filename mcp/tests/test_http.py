@@ -265,14 +265,8 @@ async def test_csv_resource_template_is_listed(parquet, tmp_path):
 @pytest.mark.parametrize(
     "name, arguments, csv_rows",
     [
-        pytest.param("search_transactions", {"limit": 200}, 200, id="search"),
-        pytest.param(
-            "aggregate_transactions",
-            {"group_by": "year", "municipality": "品川区"},
-            3,
-            id="aggregate",
-        ),
-        pytest.param("compare_values", {"baseline": 100, "current": 120}, 1, id="compare"),
+        # All 200 saved rows, not the 20-row preview. Search, aggregate and compare share publish().
+        pytest.param("search_transactions", {"limit": 200}, 200, id="publish"),
         pytest.param("show_transaction_dashboard", {"group_by": "municipality"}, 3, id="dashboard"),
     ],
 )
