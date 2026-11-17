@@ -33,7 +33,7 @@ uv sync --locked
 uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/mcp
 ```
 
-127.0.0.1:8000の `GET /ping` と `POST /invocations` を提供する。MCP接続時は `GET /resources/read` も提供する。終了はCtrl+C。
+127.0.0.1:8000の `GET /ping` と `POST /invocations` を提供する。終了はCtrl+C。
 fixtureは項目確認・新宿区の年別集計・数値比較を行う固定シナリオで、モデルAPIは呼ばない。
 質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換えた固定シナリオになる。
 推論表示にも、サンプルであることを明記した固定テキストを送る。
@@ -135,20 +135,13 @@ UIが必要になったときだけ、Apps capabilityを明示した別のリソ
 HTML・ツール引数・UI専用結果は `data_result.app` に載せ、会話メッセージへコピーしない。
 任意SQLを受け付けず、列・集計・条件値の制御はMCP側で行う。
 
-### 結果CSVのダウンロード
+### 結果CSVへのリンク
 
 MCPの結果ツールは、保存結果CSVへの `resource_link` を返す。
 Strandsの標準処理はこの型を破棄するため、`ExplorationMCPClient` が変換時に保持する。
 `ToolResultHook` はリンクをモデル向けの内容から取り除き、`data_result.downloads` に載せる。
 転送するのは `exploration://results/{32桁の16進数}.csv` かつ `text/csv` のリンクだけ。
-
-画面の操作で、Next.jsの `GET /api/resources?uri=...` からエージェントの `GET /resources/read?uri=...` へ中継する。
-エージェントは同じURI形式を再検証し、リソース専用のMCP接続で `resources/read` を送る。
-行データはモデルを通らず、会話メッセージにも入らない。取得に失敗した理由は区別せず404で返し、詳細はログに出す。
-
-このルートはローカル起動だけで有効。AgentCoreは `/invocations` と `/ping` 以外を中継しない。
-さらに、MCPの接続ごとにRuntimeセッションが変わるため、結果を保存したセッションへ後から読みに行けない。
-クラウドで使うには、保存先の共有やセッションの引き継ぎを別途設計する必要がある。
+エージェントはCSVを読まない。取得は画面のサーバー側が行う（[appのREADME](../app/README.md#結果csvのダウンロード)）。
 
 推論テキストはAG-UIの `REASONING_*` で渡し、CopilotKitの開閉表示を使う。
 次の質問の `reasoning` メッセージはモデル入力から除外する。

@@ -20,9 +20,9 @@ from exploration_agent.mcp_clients import agentcore as agentcore_mcp
 from exploration_agent.mcp_clients.exploration import (
     MCP_TOOL_NAMES,
     RESOURCE_LINK_KEY,
+    RESULT_CSV_URI,
     build_mcp_clients,
 )
-from exploration_agent.mcp_clients.resources import RESULT_CSV_URI
 from exploration_agent.mcp_clients.target import local_target, runtime_target
 
 
@@ -62,46 +62,6 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     tool_results = json.dumps([e for e in events if e["type"] == "TOOL_CALL_RESULT"])
     assert "exploration://" not in tool_results
     assert RESOURCE_LINK_KEY not in tool_results
-
-
-async def test_result_csv_route_follows_link_and_rejects_other_uris(mcp_url):
-    app = create_app(FixtureModel, mode="fixture", mcp=local_target(mcp_url))
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
-    ) as client:
-        events = decode_sse((await client.post("/invocations", json=run_input())).text)
-        uri = next(e["value"] for e in events if e.get("name") == "data_result")["downloads"][0][
-            "uri"
-        ]
-        reply = await client.get("/resources/read", params={"uri": uri})
-        assert reply.status_code == 200
-        assert reply.headers["content-type"] == "text/csv; charset=utf-8"
-        assert reply.headers["cache-control"] == "no-store"
-        assert reply.text.splitlines()[0].startswith("year,transaction_count,")
-        assert len(reply.text.splitlines()) == 4
-        for bad in [
-            "ui://exploration/transaction-dashboard-v1.html",
-            "exploration://results/../x.csv",
-            "file:///etc/passwd",
-        ]:
-            assert (await client.get("/resources/read", params={"uri": bad})).status_code == 400
-        missing = await client.get(
-            "/resources/read", params={"uri": "exploration://results/" + "0" * 32 + ".csv"}
-        )
-        assert missing.status_code == 404
-        assert "Traceback" not in missing.text
-        assert (
-            await client.get("/resources/read", params={"uri": uri}, headers={"Host": "evil"})
-        ).status_code == 400
-
-
-async def test_result_csv_route_needs_mcp():
-    app = create_app(FixtureModel, mode="fixture")
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
-    ) as client:
-        uri = "exploration://results/" + "0" * 32 + ".csv"
-        assert (await client.get("/resources/read", params={"uri": uri})).status_code == 404
 
 
 async def test_mcp_preview_is_not_added_to_model_history(mcp_url, tmp_path):

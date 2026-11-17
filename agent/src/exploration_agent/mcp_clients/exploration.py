@@ -1,5 +1,6 @@
 """The exploration MCP client and its fixed tool names."""
 
+import re
 from typing import Any
 
 from mcp.types import ResourceLink
@@ -19,6 +20,9 @@ MCP_TOOL_NAMES = (
 RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values", APP_TOOL}
 # Key of the JSON block that carries a resource_link from the MCP client to ToolResultHook.
 RESOURCE_LINK_KEY = "mcpResourceLink"
+# The only resource_link forwarded to the UI. The MCP server publishes this template.
+RESULT_CSV_URI = re.compile(r"exploration://results/[0-9a-f]{32}\.csv")
+RESULT_CSV_MIME = "text/csv"
 
 
 class ExplorationMCPClient(MCPClient):

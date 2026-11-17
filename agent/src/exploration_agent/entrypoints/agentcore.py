@@ -17,7 +17,4 @@ def create_agentcore_app() -> FastAPI:
         mcp=runtime_target(mcp_runtime_arn) if mcp_runtime_arn is not None else None,
         # AgentCore authenticates callers with IAM before forwarding to this server.
         trusted_hosts=["*"],
-        # AgentCore routes only /invocations and /ping. Each MCP connection also uses a new
-        # Runtime session, so a later read could not reach the session that saved the result.
-        result_downloads=False,
     )
