@@ -202,7 +202,6 @@ AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用す
 - UTF-8のBOMを付けて添付ファイルとして返し、キャッシュしない。不明・期限切れの結果は404で、理由を区別しない。
 - AgentCoreでは、MCPのStreamable HTTPの各POSTを `InvokeAgentRuntime`（IAM署名）で送る。新しいMCPセッションで接続し、結果はMCPがS3から読む。
 - 新しいセッションはMCPのmicroVMを起動するため、初回は数秒かかる場合がある。接続・取得の上限は各30秒。
-- `AGENT_RUNTIME_ARN` があり `MCP_RUNTIME_ARN` がない場合は501を返す。
 
 利用者の認証を導入する場合は、MCP宛ての利用者トークン（OBO等で取得）で接続する。ローカルはMCPクライアントの `authProvider`、AgentCoreはRuntimeのOAuth受け付けに切り替える。
 MCP側では、保存時と読み出し時の主体を照合する。URIは推測できないIDだけで構成し、読めるかどうかは認証で決める。

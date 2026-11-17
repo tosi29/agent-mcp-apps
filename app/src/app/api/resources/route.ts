@@ -1,5 +1,5 @@
 import { allowedOrigin } from "../../../lib/backend";
-import { mcpConfigured, ResourceUnavailableError, readResultCsv } from "../../../lib/mcp-resources";
+import { ResourceUnavailableError, readResultCsv } from "../../../lib/mcp-resources";
 import { resultCsvFilename } from "../../../lib/result-csv";
 
 export const runtime = "nodejs";
@@ -14,9 +14,6 @@ export async function GET(request: Request) {
   const filename = resultCsvFilename(uri);
   if (!filename) {
     return Response.json({ error: "対応していないリソースです。" }, { status: 400 });
-  }
-  if (!mcpConfigured()) {
-    return Response.json({ error: "MCPサーバーが設定されていません。" }, { status: 501 });
   }
   try {
     const csv = await readResultCsv(uri);

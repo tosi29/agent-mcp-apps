@@ -86,7 +86,7 @@ const csvLines = (await csv.text())
   .replace(/^\uFEFF/, "")
   .trim()
   .split("\r\n");
-assert.ok(csvLines[0].startsWith(apps ? "year," : "year,transaction_count,"));
+assert.ok(csvLines[0].startsWith("year,transaction_count,"));
 assert.equal(csvLines.length, 4);
 if (apps) {
   assert.equal(data.app?.mimeType, "text/html;profile=mcp-app");

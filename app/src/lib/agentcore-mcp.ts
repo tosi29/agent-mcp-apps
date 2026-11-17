@@ -33,8 +33,8 @@ export function mcpRuntimeFetch(arn: string, invoke: Invoke) {
         {
           agentRuntimeArn: arn,
           qualifier: "DEFAULT",
-          contentType: headers.get("content-type") ?? "application/json",
-          accept: headers.get("accept") ?? "application/json, text/event-stream",
+          contentType: headers.get("content-type") ?? undefined,
+          accept: headers.get("accept") ?? undefined,
           mcpSessionId: sessionId,
           mcpProtocolVersion: headers.get("mcp-protocol-version") ?? undefined,
           payload: new TextEncoder().encode(init.body),
@@ -42,13 +42,13 @@ export function mcpRuntimeFetch(arn: string, invoke: Invoke) {
         init.signal ?? undefined,
       );
       const status = output.statusCode ?? 200;
-      const body = output.response ? await output.response.transformToString() : null;
+      const body = (await output.response?.transformToString()) || null;
       const responseHeaders = new Headers({ "mcp-session-id": output.mcpSessionId ?? sessionId });
       if (output.contentType) responseHeaders.set("content-type", output.contentType);
       if (output.mcpProtocolVersion) {
         responseHeaders.set("mcp-protocol-version", output.mcpProtocolVersion);
       }
-      return new Response(status === 202 || status === 204 || !body?.length ? null : body, {
+      return new Response(status === 204 ? null : body, {
         status,
         headers: responseHeaders,
       });
