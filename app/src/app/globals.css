@@ -302,6 +302,32 @@ h2 {
   margin: 0 0 12px;
   font-weight: 600;
 }
+.result-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.download-button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.download-button:hover:not(:disabled) {
+  background: var(--muted);
+}
+.download-button:disabled {
+  cursor: progress;
+  color: var(--muted-foreground);
+}
+.download-error {
+  color: #a33a2b;
+}
 .table-scroll {
   overflow-x: auto;
   border: 1px solid #e2e8df;

@@ -11,6 +11,7 @@ import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { appPath } from "../lib/paths";
 import { type DataResult, type ResultRun, resultHistorySubscriber } from "../lib/result-history";
 import { McpAppResultView } from "./mcp-app-result";
+import { ResultDownloads } from "./result-downloads";
 
 const toolNames: Record<string, string> = {
   echo_text: "入力を返す（Pythonサンプル）",
@@ -200,11 +201,10 @@ function ChatWorkspace({ sandboxUrl }: { sandboxUrl?: string }) {
                   )}
                   {run.results.map((result) =>
                     result.app ? (
-                      <McpAppResultView
-                        key={result.result_id}
-                        app={result.app}
-                        sandboxUrl={sandboxUrl}
-                      />
+                      <div key={result.result_id}>
+                        <McpAppResultView app={result.app} sandboxUrl={sandboxUrl} />
+                        <ResultDownloads downloads={result.downloads} />
+                      </div>
                     ) : (
                       <ResultTable
                         key={result.result_id}
@@ -247,6 +247,7 @@ function ResultTable({ result, label }: { result: DataResult; label: string }) {
         {result.count_unit === "groups" ? "グループ" : "件"}
         <span className="small-note"> · {result.preview_rows.length}行を表示</span>
       </p>
+      <ResultDownloads downloads={result.downloads} />
       {columns.length > 0 ? (
         <div className="table-scroll">
           <table>

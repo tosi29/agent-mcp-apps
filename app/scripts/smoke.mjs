@@ -75,6 +75,23 @@ assert.deepEqual(
   data.preview_rows.map((row) => row.average_price_yen),
   [42500000, 42500000, 42500000],
 );
+// The MCP resource_link reaches the UI only; the model's history must not contain it.
+const [download] = data.downloads ?? [];
+assert.match(download?.uri ?? "", /^exploration:\/\/results\/[0-9a-f]{32}\.csv$/);
+assert.ok(!JSON.stringify(agent.messages).includes("exploration://"));
+const csv = await fetch(`${origin}/api/resources?${new URLSearchParams({ uri: download.uri })}`);
+// AgentCore cannot read a result back from the MCP session that saved it.
+const csvDownload = csv.status === 501 ? "unsupported" : "ok";
+if (csvDownload === "ok" || !process.env.SMOKE_URL) {
+  assert.equal(csv.status, 200, "CSV download through the agent backend failed");
+  assert.match(csv.headers.get("content-disposition") ?? "", /^attachment; filename="result-/);
+  const lines = (await csv.text())
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .split("\r\n");
+  assert.ok(lines[0].startsWith(apps ? "year," : "year,transaction_count,"));
+  assert.equal(lines.length, 4);
+}
 if (apps) {
   assert.equal(data.app?.mimeType, "text/html;profile=mcp-app");
   assert.ok(data.app.html.includes("取引データのダッシュボード"));
@@ -144,6 +161,7 @@ const summary = {
   data_result_ms: timing((e) => e.type === "CUSTOM" && e.name === "data_result"),
   done_ms: observations.at(-1).elapsed_ms,
   dataset: data.dataset,
+  csv_download: csvDownload,
   note: "Next.js Runtime / AG-UI transport check; browser rendering not verified",
 };
 await mkdir("../agent/results", { recursive: true });

@@ -1,4 +1,5 @@
 import type { AgentSubscriber } from "@ag-ui/client";
+import type { ResultDownload } from "./result-csv";
 
 type Row = Record<string, string | number | null>;
 export type McpAppResult = {
@@ -21,6 +22,8 @@ export type DataResult = {
   truncated: boolean;
   preview_truncated: boolean;
   preview_rows: Row[];
+  // MCP resource_links forwarded by the agent. Only the URI is held; rows are read on demand.
+  downloads?: ResultDownload[];
   app?: McpAppResult;
 };
 export type ResultRun = {
