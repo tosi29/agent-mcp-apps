@@ -135,7 +135,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
         if len(requests) == 1:
             answer = completion(tool_message("describe_dataset", {}, "call-schema"), "tool_calls")
         elif len(requests) == 2:
-            answer = completion(tool_message("search_transactions", {"limit": 200}), "tool_calls")
+            answer = completion(tool_message("search_office_market", {"limit": 200}), "tool_calls")
         else:
             answer = completion(
                 {"role": "assistant", "content": "合成データの検索結果です。"}, "stop"
@@ -154,7 +154,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     search_spec = next(
         item["function"]
         for item in requests[0]["tools"]
-        if item["function"]["name"] == "search_transactions"
+        if item["function"]["name"] == "search_office_market"
     )
     assert "tool_context" not in search_spec["parameters"]["properties"]
     assert all(request["stream"] is streaming for request in requests)
@@ -164,7 +164,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     data = custom(events, "data_result")[0]
     assert data["tool_call_id"] == "call-search"
     assert len(data["preview_rows"]) == 20
-    assert data["total_count"] == 360
+    assert data["total_count"] == 216
     artifact = json.loads((mcp_results / f"{data['result_id']}.json").read_text())
     assert len(artifact["rows"]) == 200
     model_result = next(
@@ -174,7 +174,7 @@ async def test_real_sdk_tool_loop_and_data_separation(tmp_path, streaming, mcp_u
     assert "preview_rows" not in model_result["content"]
     projection = json.loads(model_result["content"])
     assert len(projection["sample_rows"]) == 3
-    assert projection["total_count"] == 360
+    assert projection["total_count"] == 216
     assert projection["sample_truncated"] is True
     assert "rows" not in projection
     assert "合成データの検索結果です。" == "".join(
@@ -269,7 +269,7 @@ async def test_invalid_tool_input_reports_error_without_data(tmp_path, mcp_url):
         nonlocal calls
         calls += 1
         answer = (
-            completion(tool_message("search_transactions", {"limit": 201}), "tool_calls")
+            completion(tool_message("search_office_market", {"limit": 201}), "tool_calls")
             if calls == 1
             else completion({"role": "assistant", "content": "失敗しました"}, "stop")
         )

@@ -70,7 +70,7 @@ async def test_unreachable_server_is_skipped(monkeypatch, mcp_url):
     use_servers(
         monkeypatch,
         {
-            "http://127.0.0.1:9/mcp": ("search_transactions",),
+            "http://127.0.0.1:9/mcp": ("search_office_market",),
             mcp_url: ("describe_dataset",),
         },
     )
@@ -118,7 +118,7 @@ def test_timeout_is_set_on_docs_tools_only():
         hook.before_tool(before(name, tool))
         assert tool.timeout == TOOL_TIMEOUT
     other = SimpleNamespace(timeout=None)
-    hook.before_tool(before("search_transactions", other))
+    hook.before_tool(before("search_office_market", other))
     assert other.timeout is None
 
 
@@ -161,7 +161,7 @@ async def test_ui_fields_are_stripped_from_docs_results():
 
 def test_other_tool_results_are_untouched():
     result = {"status": "success", "toolUseId": "1", "content": [{"text": "x"}], "metadata": {}}
-    event: Any = SimpleNamespace(tool_use={"name": "search_transactions"}, result=result)
+    event: Any = SimpleNamespace(tool_use={"name": "search_office_market"}, result=result)
     DocsMCPHook().after_tool(event)
     assert result["content"] == [{"text": "x"}]
     assert result["metadata"] == {}

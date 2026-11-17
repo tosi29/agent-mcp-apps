@@ -35,15 +35,15 @@ async def test_mcp_exploration_and_comparison_emit_independent_results(mcp_url):
     assert len(results) == 2
     assert all(result["source"] == "mcp" for result in results)
     assert results[0]["total_count"] == 3
-    assert results[0]["dataset"] == "synthetic-real-estate-v1"
+    assert results[0]["dataset"] == "office-market-v1"
     assert results[0]["synthetic"] is True
     assert results[1]["source"] == "mcp"
     assert results[1]["preview_rows"] == [
         {
-            "baseline": 42_500_000,
-            "current": 42_500_000,
-            "difference": 0,
-            "percent_change": 0,
+            "baseline": 100,
+            "current": 120,
+            "difference": 20,
+            "percent_change": 20,
         }
     ]
     statuses = [event["value"]["status"] for event in events if event.get("name") == "tool_status"]
@@ -108,11 +108,11 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
     def handle(request):
         requests.append(json.loads(request.content))
         message = tool_message(
-            "show_transaction_dashboard", {"group_by": "quarter", "municipality": "新宿区"}
+            "show_office_market_dashboard", {"group_by": "month", "area": "新宿区"}
         )
         if parallel:
             message["tool_calls"] += tool_message(
-                "show_transaction_dashboard", {"group_by": "quarter"}, "call-second-app"
+                "show_office_market_dashboard", {"group_by": "month"}, "call-second-app"
             )["tool_calls"]
         answer = (
             completion(message, "tool_calls")
@@ -142,14 +142,14 @@ async def test_mcp_app_html_and_ui_metadata_are_not_sent_to_model(mcp_url, monke
     assert len({result["result_id"] for result in results}) == len(results)
     assert len(loads) == 1
     result = results[0]
-    assert len(result["preview_rows"]) == 4
+    assert len(result["preview_rows"]) == 12
     app = result["app"]
-    assert app["resourceUri"] == "ui://exploration/transaction-dashboard-v1.html"
+    assert app["resourceUri"] == "ui://exploration/office-market-dashboard-v1.html"
     assert app["mimeType"] == "text/html;profile=mcp-app"
     assert "<html" in app["html"]
-    assert app["toolInput"]["group_by"] == "quarter"
+    assert app["toolInput"]["group_by"] == "month"
     assert app["toolResult"]["content"][0]["type"] == "text"
-    assert len(app["toolResult"]["_meta"]["preview"]["preview_rows"]) == 4
+    assert len(app["toolResult"]["_meta"]["preview"]["preview_rows"]) == 12
     assert "preview_rows" not in json.dumps(requests)
     assert "<html" not in json.dumps(requests)
     tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")

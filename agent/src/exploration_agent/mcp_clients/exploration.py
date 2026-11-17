@@ -7,12 +7,12 @@ from exploration_agent.mcp_clients.target import MCPTarget
 
 MCP_TOOL_NAMES = (
     "describe_dataset",
-    "search_transactions",
-    "aggregate_transactions",
+    "search_office_market",
+    "aggregate_office_market",
     "compare_values",
     APP_TOOL,
 )
-RESULT_TOOLS = {"search_transactions", "aggregate_transactions", "compare_values", APP_TOOL}
+RESULT_TOOLS = {"search_office_market", "aggregate_office_market", "compare_values", APP_TOOL}
 
 
 def build_mcp_clients(target: MCPTarget | None) -> list[MCPClient]:

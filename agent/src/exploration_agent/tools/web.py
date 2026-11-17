@@ -83,10 +83,10 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
 
     @tool
     def web_fetch(url: str) -> dict[str, Any]:
-        """指定したURLのページ本文を取得する。取引データの検索・集計には使わない。
+        """指定したURLのページ本文を取得する。市況データの検索・集計には使わない。
 
         Args:
-            url: http(s)のURL。取引データの値や利用者の個人情報を含めない。
+            url: http(s)のURL。市況データの値や利用者の個人情報を含めない。
         """
         if not _is_web_url(url):
             raise ValueError("urlはhttp(s)のURLにしてください")
@@ -121,10 +121,10 @@ def build_web_fetch_tool(*, transport: httpx2.BaseTransport | None = None):
 def build_web_search_tool(*, transport: httpx2.BaseTransport | None = None):
     @tool
     def web_search(query: str) -> dict[str, Any]:
-        """外部Webを検索し、タイトル・URL・短い抜粋を返す。取引データの検索・集計には使わない。
+        """外部Webを検索し、タイトル・URL・短い抜粋を返す。市況データの検索・集計には使わない。
 
         Args:
-            query: 400文字以内の検索語。取引データの値や利用者の個人情報を含めない。
+            query: 400文字以内の検索語。市況データの値や利用者の個人情報を含めない。
         """
         if not query.strip() or len(query) > MAX_QUERY_CHARS:
             raise ValueError("queryは1〜400文字の文字列にしてください")

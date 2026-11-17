@@ -9,8 +9,8 @@ from mcp.types import TextResourceContents
 
 from exploration_agent.mcp_clients.target import MCPTarget
 
-APP_TOOL = "show_transaction_dashboard"
-APP_URI = "ui://exploration/transaction-dashboard-v1.html"
+APP_TOOL = "show_office_market_dashboard"
+APP_URI = "ui://exploration/office-market-dashboard-v1.html"
 APP_MIME = "text/html;profile=mcp-app"
 
 

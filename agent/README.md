@@ -10,11 +10,11 @@ Strands・さくらAI Engine・AG-UIを接続するPythonプロジェクト。Py
 | `echo_text` | 通常のPython関数 | 入力をそのまま返す接続検証サンプル |
 | `web_search` | 通常のPython関数（任意） | TavilyでWebを検索し、タイトル・URL・短い抜粋を返す |
 | `web_fetch` | 通常のPython関数（任意） | 指定したURLのページ本文をTavilyで取得して返す |
-| `describe_dataset` | MCP | 項目・単位・地域候補・件数の確認 |
-| `search_transactions` | MCP | 地域・年・価格範囲で検索 |
-| `aggregate_transactions` | MCP | 地域・年・四半期で集計 |
+| `describe_dataset` | MCP | 項目・単位・地区候補・期間・合成データかの確認 |
+| `search_office_market` | MCP | 地区・期間・月・空室率範囲で月次値を検索 |
+| `aggregate_office_market` | MCP | 地区・年・月で空室率・賃料を集計 |
 | `compare_values` | MCP | 差分・増減率の計算 |
-| `show_transaction_dashboard` | MCP Apps | 棒グラフと表のダッシュボードを表示 |
+| `show_office_market_dashboard` | MCP Apps | 棒グラフと表のダッシュボードを表示 |
 
 通常のPythonツールの例は `src/exploration_agent/tools/echo.py` の `echo_text`。
 MCP未接続でも使用でき、外部通信・ファイル操作・状態変更は行わない。
@@ -34,7 +34,8 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 ```
 
 127.0.0.1:8000の `GET /ping` と `POST /invocations` を提供する。終了はCtrl+C。
-fixtureは項目確認・新宿区の年別集計・数値比較を行う固定シナリオで、モデルAPIは呼ばない。
+fixtureは項目確認・千代田区の年別集計・固定値の数値比較を行う固定シナリオで、モデルAPIは呼ばない。
+データが合成か実データかに依存しないよう、固定の回答文には集計値を含めない。
 質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換えた固定シナリオになる。
 推論表示にも、サンプルであることを明記した固定テキストを送る。
 MCP接続先を省略したfixtureは `echo_text` だけを呼ぶ。検索結果は生成しない。
@@ -98,8 +99,8 @@ SecureStringからキーを読む。両方あればパラメータを優先す�
 `web_search` と `web_fetch` の呼び出し回数は制限しない。1質問全体の300秒のタイムアウトまで、モデルの判断次第でTavilyのクレジットを消費する。
 
 検索クエリと取得するURLはTavilyへ送られ、検索結果とページ本文はモデルAPIへ送られる。実データの導入前に送信範囲を確認する。
-検索結果とページ本文は未検証の外部情報として扱い、文中の指示に従わず、合成データの集計と分けて回答するようモデルへ指示している。
-これはモデルへの指示であり、不正な指示や取引データのクエリ・URLへの混入を確実に防ぐものではない。
+検索結果とページ本文は未検証の外部情報として扱い、文中の指示に従わず、市況データの集計と分けて回答するようモデルへ指示している。
+これはモデルへの指示であり、不正な指示や市況データのクエリ・URLへの混入を確実に防ぐものではない。
 特に `web_fetch` のURLは任意のサイトへ届くため、ページ内の不正な指示に従うとデータが外部へ送られる可能性がある。実データの導入前に制限を見直す。
 
 ## AWS・Azureのドキュメント用MCP
