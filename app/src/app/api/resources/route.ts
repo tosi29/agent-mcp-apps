@@ -1,6 +1,5 @@
-import { agentRuntimeArn } from "../../../lib/agentcore";
 import { allowedOrigin } from "../../../lib/backend";
-import { ResourceUnavailableError, readResultCsv } from "../../../lib/mcp-resources";
+import { mcpConfigured, ResourceUnavailableError, readResultCsv } from "../../../lib/mcp-resources";
 import { resultCsvFilename } from "../../../lib/result-csv";
 
 export const runtime = "nodejs";
@@ -16,12 +15,8 @@ export async function GET(request: Request) {
   if (!filename) {
     return Response.json({ error: "対応していないリソースです。" }, { status: 400 });
   }
-  if (agentRuntimeArn()) {
-    // The deployed MCP keeps results per Runtime session and has no user authentication yet.
-    return Response.json(
-      { error: "クラウド構成ではCSVのダウンロードに対応していません。" },
-      { status: 501 },
-    );
+  if (!mcpConfigured()) {
+    return Response.json({ error: "MCPサーバーが設定されていません。" }, { status: 501 });
   }
   try {
     const csv = await readResultCsv(uri);

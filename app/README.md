@@ -72,6 +72,7 @@ AgentCoreへ直接接続する場合は、サーバー側に `AGENT_RUNTIME_ARN`
 `InvokeAgentRuntime` と `GetAgentRuntime` の権限が必要。AgentCore接続時の接続モードは常に `sakura` とする。
 
 結果CSVを読むMCPサーバーは `MCP_URL` で指定する。既定値は `http://127.0.0.1:8001/mcp` で、ループバックのHTTPだけを許可する。
+AgentCoreのMCPを使う場合は `MCP_RUNTIME_ARN` を設定する（`MCP_URL` より優先）。`InvokeAgentRuntime` の権限が必要。
 
 ## MCP Appsの表示
 
@@ -161,7 +162,6 @@ SMOKE_URL=https://example.execute-api.ap-northeast-1.amazonaws.com/poc/ npm run 
 
 Next.js RuntimeからPythonツールまでを通し、静的ファイルの取得、ストリーム、独立した結果イベント、
 品川区の年別集計の期待値、正常終端、テレメトリ無効設定、結果CSVのリンクと取得を検査する。
-CSVの取得は、`SMOKE_URL` 指定時に限り、クラウド構成の未対応を示す501も許容する。
 ブラウザ描画とモデルの推論品質は対象外。
 
 実APIで同じ経路を試す場合は、Pythonをさくらモードで起動して明示的に指定する。
@@ -198,11 +198,13 @@ AWS側がさくらモードの場合は `SMOKE_URL` と `-- --live` を併用す
 ボタンを押すと `GET /api/resources?uri=...` を呼び、Next.jsのサーバー側がMCPクライアントとして `resources/read` を送る。
 エージェントとモデルは経由しない。ブラウザはMCPへ直接接続しない。
 
-- URIは結果CSVの形式に限る。送り先は `MCP_URL` の固定サーバーで、URIから決めない。
+- URIは結果CSVの形式に限る。送り先は `MCP_RUNTIME_ARN` または `MCP_URL` の固定サーバーで、URIから決めない。
 - UTF-8のBOMを付けて添付ファイルとして返し、キャッシュしない。不明・期限切れの結果は404で、理由を区別しない。
-- AgentCore構成（`AGENT_RUNTIME_ARN` 設定時）では501を返す。MCPの保存先がRuntimeセッションごとの一時ファイルで、利用者の認証もないため。
+- AgentCoreでは、MCPのStreamable HTTPの各POSTを `InvokeAgentRuntime`（IAM署名）で送る。新しいMCPセッションで接続し、結果はMCPがS3から読む。
+- 新しいセッションはMCPのmicroVMを起動するため、初回は数秒かかる場合がある。接続・取得の上限は各30秒。
+- `AGENT_RUNTIME_ARN` があり `MCP_RUNTIME_ARN` がない場合は501を返す。
 
-利用者の認証を導入する場合は、MCP宛ての利用者トークン（OBO等で取得）をMCPクライアントの `authProvider` に渡す。
+利用者の認証を導入する場合は、MCP宛ての利用者トークン（OBO等で取得）で接続する。ローカルはMCPクライアントの `authProvider`、AgentCoreはRuntimeのOAuth受け付けに切り替える。
 MCP側では、保存時と読み出し時の主体を照合する。URIは推測できないIDだけで構成し、読めるかどうかは認証で決める。
 
 会話はInMemoryAgentRunnerに一時保持する。上限は10スレッド、各5run、保持済みイベント約8MB。
