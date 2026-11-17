@@ -81,14 +81,29 @@ DuckDBのRelational API・Expression APIで条件を構築し、任意SQL・列�
 
 検索・集計の戻り値は明示的な `CallToolResult` で分離する。
 
-- `content`：件数・要約・最大3行のサンプル。
+- `content`：件数・要約・最大3行のサンプルと、保存結果CSVへの `resource_link`。
 - `structuredContent`：結果ID・件数・最大20行の画面用プレビュー。
 - 保存ファイル：上限200行の結果。ローカルは `results/`、AgentCoreは `/tmp/results`。
 
 単純な辞書の自動変換で表示用データを `content` に重複させない。
 エージェント側は表示用データをAG-UIへ投影した後、会話状態から除去する。
 保存結果は一時ファイルで、Runtimeセッションをまたぐ保持を保証しない。
-全量を取得するWeb APIやMCPリソースは未実装。
+Web APIでの結果取得は未実装。
+
+## 結果CSVのリソース
+
+検索・集計・比較・ダッシュボードの4ツールは、`content` の2要素目に `resource_link` を返す。
+URIは `exploration://results/{result_id}.csv`、MIMEは `text/csv`。リンク自体は参照だけで行データを含まない。
+クライアントは必要なときに同じMCPサーバーへ `resources/read` を送り、保存結果（最大200行）をCSVで受け取る。
+テンプレートは `resources/templates/list` で確認できる。`resources/list` には個々の結果を列挙しない。
+
+- 1行目は列名。改行はCRLF、空値は空欄。
+- `= + - @` 等で始まる文字列セルは先頭に `'` を付け、表計算ソフトで数式として評価させない。数値はそのまま出力する。
+- 結果IDは32桁の小文字16進数に限る。不明・不正なIDは `-32602` を返し、ローカルパスを含めない。
+- 保存先は一時ファイルのため、別のRuntimeセッションや再起動後には読めない場合がある。
+
+エージェント（Strands）はツール結果の `resource_link` をモデル向けの内容へ変換せず破棄する。
+画面からのCSV取得は未実装。
 
 以下は `mcp/` で実行する。結果IDは同じMCP環境で保存したものに限る。
 
@@ -192,7 +207,7 @@ uv run --locked pyright src tests
 uv run --locked pytest -q
 ```
 
-HTTPテストは5ツールの公開・UIリソース取得・テキストフォールバック・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
+HTTPテストは5ツールの公開・UIリソース取得・結果CSVのリンクと読み出し・テキストフォールバック・モデル用3行／画面用20行の分離・入力エラー・Host/Origin制約を確認する。
 Strandsとの実HTTP接続・AG-UI結果イベント・モデル履歴との分離は `agent/` の `uv run --locked pytest -q` で確認する。
 UIの描画処理・指標切り替え・0件表示は `npm --prefix mcp/ui test`（リポジトリ直下）で検査する。
 UIの整形とlintは `npm --prefix mcp/ui run lint` で検査し、`npm --prefix mcp/ui run lint:fix` で自動修正する。

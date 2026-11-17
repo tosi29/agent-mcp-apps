@@ -9,7 +9,7 @@ from mcp.server.apps import Apps, ResourceCsp
 from mcp.types import CallToolResult, TextContent
 
 from exploration_mcp.data import DataExplorer, Filters
-from exploration_mcp.results import ResultStore, model_summary
+from exploration_mcp.results import ResultStore, csv_link, model_summary
 
 DASHBOARD_URI = "ui://exploration/transaction-dashboard-v1.html"
 
@@ -48,7 +48,10 @@ def dashboard_app(explorer: DataExplorer, store: ResultStore) -> Apps:
         preview = store.put({"source": "mcp", "group_by": group_by, **result})
         summary = model_summary(result, preview["result_id"])
         return CallToolResult(
-            content=[TextContent(text=json.dumps(summary, ensure_ascii=False, allow_nan=False))],
+            content=[
+                TextContent(text=json.dumps(summary, ensure_ascii=False, allow_nan=False)),
+                csv_link(preview),
+            ],
             structured_content=summary,
             _meta={"preview": preview},
         )

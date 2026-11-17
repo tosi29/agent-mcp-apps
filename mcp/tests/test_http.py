@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 from contextlib import asynccontextmanager
 
@@ -5,6 +7,7 @@ import httpx
 import pytest
 
 from exploration_mcp.apps import DASHBOARD_URI
+from exploration_mcp.results import CSV_URI_TEMPLATE
 from exploration_mcp.server import create_agentcore_app, create_app
 
 
@@ -246,3 +249,61 @@ async def test_agentcore_entrypoint_accepts_internal_host_and_platform_session_b
                 )
             ).status_code == 403
             assert (await client.post("/mcp", content="x" * (128 * 1024 + 1))).status_code == 413
+
+
+async def test_result_tools_link_csv_resource_readable_on_same_server(parquet, tmp_path):
+    async with http_client(parquet, tmp_path) as client:
+        templates = (
+            await client.post(
+                "/mcp",
+                json=rpc("resources/templates/list", {}),
+                headers={"Mcp-Method": "resources/templates/list"},
+            )
+        ).json()["result"]["resourceTemplates"]
+        assert [t["uriTemplate"] for t in templates] == [CSV_URI_TEMPLATE]
+        for name, arguments, count in [
+            ("search_transactions", {"limit": 200}, 200),
+            ("aggregate_transactions", {"group_by": "year", "municipality": "新宿区"}, 3),
+            ("compare_values", {"baseline": 100, "current": 120}, 1),
+            ("show_transaction_dashboard", {"group_by": "municipality"}, 3),
+        ]:
+            result = (
+                await client.post(
+                    "/mcp",
+                    json=rpc("tools/call", {"name": name, "arguments": arguments}),
+                    headers={"Mcp-Method": "tools/call", "Mcp-Name": name},
+                )
+            ).json()["result"]
+            # The model's text stays first; the link carries no rows, only a reference.
+            text, link = result["content"]
+            assert text["type"] == "text"
+            assert link["type"] == "resource_link"
+            assert link["mimeType"] == "text/csv"
+            assert "rows" not in json.dumps(link)
+            contents = (
+                await client.post(
+                    "/mcp",
+                    json=rpc("resources/read", {"uri": link["uri"]}),
+                    headers={"Mcp-Method": "resources/read", "Mcp-Name": link["uri"]},
+                )
+            ).json()["result"]["contents"]
+            assert contents[0]["mimeType"] == "text/csv"
+            rows = list(csv.DictReader(io.StringIO(contents[0]["text"], newline="")))
+            assert len(rows) == count
+        assert rows[0].keys() >= {"municipality", "transaction_count", "average_price_yen"}
+
+
+@pytest.mark.parametrize(
+    "uri", ["exploration://results/" + "0" * 32 + ".csv", "exploration://results/../x.csv"]
+)
+async def test_unknown_or_malformed_csv_resource_is_not_found(parquet, tmp_path, uri):
+    async with http_client(parquet, tmp_path) as client:
+        error = (
+            await client.post(
+                "/mcp",
+                json=rpc("resources/read", {"uri": uri}),
+                headers={"Mcp-Method": "resources/read", "Mcp-Name": uri},
+            )
+        ).json()["error"]
+        assert error["code"] == -32602
+        assert str(tmp_path) not in error["message"]

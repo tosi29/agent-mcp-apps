@@ -6,11 +6,18 @@ from collections.abc import Mapping
 from typing import Literal
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ResourceNotFoundError
 from mcp.types import CallToolResult, TextContent
 
 from exploration_mcp.comparison import compare_values as compare
 from exploration_mcp.data import DataExplorer, Filters
-from exploration_mcp.results import ResultStore, model_summary
+from exploration_mcp.results import (
+    CSV_MIME,
+    CSV_URI_TEMPLATE,
+    ResultStore,
+    csv_link,
+    model_summary,
+)
 
 
 def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore) -> None:
@@ -24,10 +31,27 @@ def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore
                         ensure_ascii=False,
                         allow_nan=False,
                     )
-                )
+                ),
+                csv_link(preview),
             ],
             structured_content=preview,
         )
+
+    @server.resource(
+        CSV_URI_TEMPLATE,
+        name="result-csv",
+        title="保存した結果のCSV",
+        description="検索・集計・比較ツールが保存した結果（最大200行・合成データ）をCSVで返す。",
+        mime_type=CSV_MIME,
+    )
+    async def result_csv(result_id: str) -> str:
+        try:
+            return await asyncio.to_thread(store.get_csv, result_id)
+        except KeyError:
+            # Do not echo local paths; the ID is either malformed or from another environment.
+            raise ResourceNotFoundError(
+                "結果が見つかりません。同じMCP環境で保存した結果IDか確認してください"
+            ) from None
 
     @server.tool()
     async def describe_dataset() -> dict:

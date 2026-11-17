@@ -1,10 +1,19 @@
 """Bounded local result artifacts, independent from the model's tool results."""
 
+import csv
+import io
 import json
 import re
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+from mcp.types import ResourceLink
+
+CSV_URI_TEMPLATE = "exploration://results/{result_id}.csv"
+CSV_MIME = "text/csv"
+# Spreadsheet apps evaluate cells starting with these as formulas.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
 class ResultStore:
@@ -30,6 +39,43 @@ class ResultStore:
         if not re.fullmatch(r"[0-9a-f]{32}", result_id):
             raise ValueError("invalid result_id")
         return json.loads((self.directory / f"{result_id}.json").read_text(encoding="utf-8"))
+
+    def get_csv(self, result_id: str) -> str:
+        """The stored rows (at most 200) as RFC 4180 CSV. Raises KeyError if unknown."""
+        try:
+            result = self.get(result_id)
+        except (ValueError, FileNotFoundError) as error:
+            raise KeyError(result_id) from error
+        return to_csv(result["rows"])
+
+
+def _cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
+def to_csv(rows: list[dict[str, Any]]) -> str:
+    output = io.StringIO()
+    if rows:
+        writer = csv.DictWriter(output, fieldnames=list(rows[0]), lineterminator="\r\n")
+        writer.writeheader()
+        writer.writerows({k: _cell(v) for k, v in row.items()} for row in rows)
+    return output.getvalue()
+
+
+def csv_link(preview: dict[str, Any]) -> ResourceLink:
+    """A reference only: the client reads the CSV with resources/read when it needs it."""
+    return ResourceLink(
+        uri=CSV_URI_TEMPLATE.format(result_id=preview["result_id"]),
+        name=f"result-{preview['result_id']}.csv",
+        title="保存した結果のCSV（合成データ）",
+        description=(
+            f"保存済みの{preview['returned_count']}行。"
+            "同じMCPサーバーでresources/readすると取得できる一時ファイル。"
+        ),
+        mime_type=CSV_MIME,
+    )
 
 
 def model_summary(result: dict[str, Any], result_id: str) -> dict[str, Any]:
