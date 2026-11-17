@@ -147,6 +147,7 @@ MCP Runtimeは `prevent_destroy` のため、作成後にダイジェストをnu
 検索・集計の結果は、MCP専用のS3バケット（名前は `agent-mcp-apps-results-` で始まる）に保存する。
 公開アクセスを遮断し、TLS以外の通信を拒否する。`results/` 以下は `results_retention_days`（既定1日）で失効する。
 読み書きできるのはMCPの実行ロールだけで、`MCP_RESULTS_BUCKET` でMCPへ渡す。
+`results/` に限った `s3:ListBucket` も付け、期限切れ・存在しない結果を `AccessDenied` ではなく `NoSuchKey` として扱う。
 画面のLambdaには `MCP_RUNTIME_ARN` と、MCP Runtimeへの `InvokeAgentRuntime` 権限を付け、結果CSVを `resources/read` で読む。
 LambdaはS3へ直接アクセスしない。S3の保存・リクエストに少額の料金が発生し得る。
 

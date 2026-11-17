@@ -34,6 +34,14 @@ class RejectBrowserOrigin:
         await self.app(scope, receive, send)
 
 
+def result_store(results_dir: Path | None, *, agentcore: bool) -> ResultStore:
+    # A shared bucket lets later connections (other AgentCore sessions) read saved results.
+    if bucket := os.environ.get("MCP_RESULTS_BUCKET"):
+        return S3ResultStore(bucket)
+    default = "/tmp/results" if agentcore else "results"
+    return ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default)))
+
+
 def create_app(
     *, agentcore: bool = False, data_path: Path | None = None, results_dir: Path | None = None
 ):
@@ -41,14 +49,7 @@ def create_app(
     explorer = DataExplorer(data_path or Path(os.environ.get("MCP_DATA_PATH", DEFAULT_DATA)))
     # Connections are closed before Runtime V2 can capture its startup snapshot.
     explorer.describe()
-    default_results = "/tmp/results" if agentcore else "results"
-    bucket = os.environ.get("MCP_RESULTS_BUCKET")
-    # A shared bucket lets later connections (other AgentCore sessions) read saved results.
-    store = (
-        S3ResultStore(bucket)
-        if bucket and results_dir is None
-        else ResultStore(results_dir or Path(os.environ.get("MCP_RESULTS_DIR", default_results)))
-    )
+    store = result_store(results_dir, agentcore=agentcore)
     server = MCPServer(
         "exploration-tools",
         subscriptions=False,

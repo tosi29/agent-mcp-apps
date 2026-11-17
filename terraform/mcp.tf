@@ -115,6 +115,13 @@ resource "aws_iam_role_policy" "mcp" {
         Resource = "${aws_s3_bucket.results.arn}/results/*"
       },
       {
+        # Without it, S3 answers a missing key with AccessDenied instead of NoSuchKey.
+        Effect    = "Allow"
+        Action    = ["s3:ListBucket"]
+        Resource  = aws_s3_bucket.results.arn
+        Condition = { StringLike = { "s3:prefix" = "results/*" } }
+      },
+      {
         Effect   = "Allow"
         Action   = ["logs:DescribeLogGroups"]
         Resource = "arn:${local.partition}:logs:ap-northeast-1:${local.account_id}:log-group:*"

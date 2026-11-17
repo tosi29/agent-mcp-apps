@@ -85,7 +85,8 @@ class S3ResultStore(ResultStore):
                 Bucket=self.bucket, Key=f"{self.prefix}{result_id}.json"
             )
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") in {"NoSuchKey", "404"}:
+            # With s3:ListBucket, a missing key is NoSuchKey rather than AccessDenied.
+            if error.response.get("Error", {}).get("Code") == "NoSuchKey":
                 raise FileNotFoundError(result_id) from error
             raise
         return response["Body"].read()
