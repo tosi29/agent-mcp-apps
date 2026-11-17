@@ -15,11 +15,20 @@ def mcp_service(tmp_path_factory, unused_tcp_port_factory):
     python = root / ".venv/bin/python"
     assert python.exists(), "Run uv sync --locked in mcp/ before agent integration tests"
     directory = tmp_path_factory.mktemp("mcp-service")
-    parquet = directory / "synthetic.parquet"
+    parquet = directory / "transactions.parquet"
     results = directory / "results"
     env = {**os.environ, "PYTHONPATH": str(root / "src")}
     subprocess.run(
-        [str(python), "-m", "exploration_mcp.server", "--data", str(parquet), "prepare-sample"],
+        [
+            str(python),
+            "-m",
+            "exploration_mcp.server",
+            "--data",
+            str(parquet),
+            "prepare-data",
+            "--source",
+            str(root / "source"),
+        ],
         check=True,
         env=env,
         stdout=subprocess.DEVNULL,

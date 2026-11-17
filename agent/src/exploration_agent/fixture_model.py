@@ -12,16 +12,16 @@ from strands.types.content import ContentBlockStartToolUse
 from strands.types.streaming import StreamEvent
 
 REASONING_NOTICE = "これは推論表示の接続検証用サンプルです。実際のモデルの推論ではありません。"
-AGGREGATE_ARGS = {"municipality": "新宿区", "group_by": "year"}
+AGGREGATE_ARGS = {"municipality": "品川区", "group_by": "year"}
+COMPARE_ARGS = {"baseline": 100, "current": 120}
 MCP_REASONING = (REASONING_NOTICE, "MCPの項目確認・年別集計を実行します。")
+# Canned text must not look like a model reading the data, so it states no data values.
 MCP_ANSWER = (
-    "これは接続検証用の固定シナリオです。合成データの新宿区を年別に集計しました。\n\n",
-    "| 年 | 件数 | 平均取引総額 |\n|---|---:|---:|\n",
-    "| 2023 | 40 | 42,500,000円 |\n",
-    "| 2024 | 40 | 42,500,000円 |\n",
-    "| 2025 | 40 | 42,500,000円 |\n\n",
-    "実際の不動産取引や市場価格ではありません。",
-    "\nMCPツールで平均取引総額を比較しました。差分は0円、増減率は0%です。",
+    "これは接続検証用の固定シナリオです。品川区の取引を年別に集計しました。\n\n",
+    "集計値は結果パネルを参照してください。",
+    "この文章は固定応答で、モデルが集計結果を読んで書いたものではありません。\n",
+    "比較ツールは固定値100と120で接続を確認しました（差分20、増減率20%）。\n\n",
+    "出典：国土交通省 不動産情報ライブラリ（「不動産取引価格情報」をもとに加工して作成）",
 )
 
 
@@ -38,7 +38,7 @@ def mcp_scenario(result_tool: str) -> Scenario:
         (
             ("describe_dataset", {}),
             (result_tool, AGGREGATE_ARGS),
-            ("compare_values", {"baseline": 42_500_000, "current": 42_500_000}),
+            ("compare_values", COMPARE_ARGS),
         ),
         MCP_ANSWER,
     )

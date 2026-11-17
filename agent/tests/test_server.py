@@ -52,7 +52,7 @@ async def test_http_agui_endpoint_runs_real_tools(tmp_path, mcp_url):
     assert sum(e["type"] == "RUN_FINISHED" for e in events) == 1
     result = next(e["value"] for e in events if e.get("name") == "data_result")
     assert result["total_count"] == 3
-    assert [row["transaction_count"] for row in result["preview_rows"]] == [40] * 3
+    assert [row["year"] for row in result["preview_rows"]] == [2023, 2024, 2025]
 
 
 async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
@@ -94,7 +94,7 @@ async def test_preview_and_client_state_never_reach_model(tmp_path, mcp_url):
     assert events[-1]["type"] == "RUN_FINISHED", events
     preview = next(e["value"] for e in events if e.get("name") == "data_result")
     assert len(preview["preview_rows"]) == 20
-    assert preview["total_count"] == 360
+    assert preview["total_count"] == 4143
     tool_result = next(m for m in requests[-1]["messages"] if m["role"] == "tool")
     summary = json.loads(tool_result["content"])
     assert len(summary["sample_rows"]) == 3
@@ -288,7 +288,7 @@ async def test_followup_replays_history_once_without_preview(tmp_path):
         body = json.loads(request.content)
         requests.append(body)
         return response(
-            completion({"role": "assistant", "content": "合成データです。"}, "stop"), True
+            completion({"role": "assistant", "content": "取引データです。"}, "stop"), True
         )
 
     async with AsyncOpenAI(
