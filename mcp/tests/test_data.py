@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from statistics import mean
 
 import duckdb
 import pytest
@@ -7,44 +8,79 @@ from duckdb import col, fn
 from exploration_mcp.data import DataExplorer, Filters
 from exploration_mcp.results import ResultStore, model_summary
 
+MUNICIPALITIES = ["品川区", "大田区", "川崎市幸区"]
 
-def test_search_and_grouped_values(parquet):
+
+def year(row):
+    return int(row["取引時期"][:4])
+
+
+def test_search_and_grouped_values_match_source(parquet, source_rows):
     explorer = DataExplorer(parquet)
-    assert explorer.describe()["row_count"] == 360
-    result = explorer.search(Filters("新宿区", 2024, 40_000_000, 50_000_000))
-    # Independent fixture arithmetic, rather than repeating the SQL under test.
-    expected = [i + 1 for i in range(360) if i % 3 == 1 and (i // 3) % 3 == 1 and 4 <= i % 10 <= 6]
-    assert [r["transaction_id"] for r in result["rows"]] == expected
-    grouped = explorer.aggregate("year", Filters("新宿区"))
-    assert [r["transaction_count"] for r in grouped["rows"]] == [40, 40, 40]
-    assert [r["average_price_yen"] for r in grouped["rows"]] == [42_500_000] * 3
+    assert explorer.describe()["row_count"] == len(source_rows)
+    expected = [
+        int(r["取引価格（総額）"])
+        for r in source_rows
+        if r["市区町村名"] == "品川区"
+        and year(r) == 2024
+        and 40_000_000 <= int(r["取引価格（総額）"]) <= 50_000_000
+    ]
+    result = explorer.search(Filters("品川区", 2024, "", 40_000_000, 50_000_000), 200)
+    assert [r["price_yen"] for r in result["rows"]] == expected
+    assert result["total_count"] == len(expected) > 0
+    grouped = explorer.aggregate("year", Filters("品川区"))
+    for row in grouped["rows"]:
+        prices = [
+            int(r["取引価格（総額）"])
+            for r in source_rows
+            if r["市区町村名"] == "品川区" and year(r) == row["year"]
+        ]
+        assert row["transaction_count"] == len(prices)
+        assert row["average_price_yen"] == round(mean(prices), 2)
+        assert (row["min_price_yen"], row["max_price_yen"]) == (min(prices), max(prices))
+    assert [r["year"] for r in grouped["rows"]] == [2023, 2024, 2025]
 
 
-def test_empty_and_bounded_results(parquet):
+def test_property_type_filter_and_group(parquet, source_rows):
+    explorer = DataExplorer(parquet)
+    land = sum(r["種類"] == "宅地(土地)" for r in source_rows)
+    # Full-width parentheses typed by a user are normalized to the source's ASCII form.
+    assert explorer.search(Filters(property_type="宅地（土地）"), 1)["total_count"] == land
+    grouped = explorer.aggregate("property_type", Filters())
+    assert {r["property_type"]: r["transaction_count"] for r in grouped["rows"]} == {
+        "宅地(土地)": land,
+        "宅地(土地と建物)": len(source_rows) - land,
+    }
+
+
+def test_empty_and_bounded_results(parquet, source_rows):
     explorer = DataExplorer(parquet)
     assert explorer.search(Filters("不存在"))["total_count"] == 0
     assert explorer.aggregate("year", Filters("不存在"))["rows"] == []
     result = explorer.search(Filters(), 200)
-    assert result["total_count"] == 360
+    assert result["total_count"] == len(source_rows)
     assert result["returned_count"] == 200
     assert result["truncated"] is True
-    assert explorer.search(Filters("　新宿区　"), 1)["total_count"] == 120
+    shinagawa = sum(r["市区町村名"] == "品川区" for r in source_rows)
+    assert explorer.search(Filters("　品川区　"), 1)["total_count"] == shinagawa
 
 
-def test_describe_preserves_schema_metadata(parquet):
+def test_describe_preserves_schema_metadata_and_attribution(parquet):
     description = DataExplorer(parquet).describe()
-    assert [column["column_name"] for column in description["columns"]] == [
-        "transaction_id",
-        "municipality",
-        "year",
-        "quarter",
-        "price_yen",
-        "area_m2",
-    ]
+    types = {
+        "transaction_id": "BIGINT",
+        "municipality": "VARCHAR",
+        "year": "BIGINT",
+        "quarter": "BIGINT",
+        "property_type": "VARCHAR",
+        "price_yen": "BIGINT",
+        "area_m2": "BIGINT",
+    }
+    assert [column["column_name"] for column in description["columns"]] == list(types)
     for column in description["columns"]:
         assert column == {
             "column_name": column["column_name"],
-            "column_type": "VARCHAR" if column["column_name"] == "municipality" else "BIGINT",
+            "column_type": types[column["column_name"]],
             "null": "YES",
             "key": None,
             "default": None,
@@ -53,35 +89,43 @@ def test_describe_preserves_schema_metadata(parquet):
         }
         assert column["meaning"]
     assert description["municipalities"] == [
-        {"municipality": name} for name in ["千代田区", "新宿区", "渋谷区"]
+        {"municipality": name} for name in sorted(MUNICIPALITIES)
     ]
+    assert (description["first_period"], description["last_period"]) == (
+        "2023年第1四半期",
+        "2025年第4四半期",
+    )
+    assert "国土交通省 不動産情報ライブラリ" in description["attribution"]
 
 
 def _write_transactions(path, rows):
     # Build independent input data, without using the query expressions under test.
     with duckdb.connect() as conn:
         conn.execute("""CREATE TABLE fixture (
-            transaction_id BIGINT, municipality VARCHAR, year BIGINT,
-            quarter BIGINT, price_yen BIGINT, area_m2 BIGINT
+            transaction_id BIGINT, municipality VARCHAR, year BIGINT, quarter BIGINT,
+            property_type VARCHAR, price_yen BIGINT, area_m2 BIGINT
         )""")
-        conn.executemany("INSERT INTO fixture VALUES (?, ?, ?, ?, ?, ?)", rows)
+        conn.executemany("INSERT INTO fixture VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
         conn.table("fixture").write_parquet(str(path))
 
 
 def test_exact_matching_treats_special_characters_as_values(tmp_path):
     names = ["a%b", "axb", "a_b", "acb", "a'b", r"a\b", "' OR 1=1 --"]
     path = tmp_path / "literal.parquet"
-    _write_transactions(path, [(i, name, 2024, 1, 100, 50) for i, name in enumerate(names)])
+    _write_transactions(path, [(i, name, 2024, 1, name, 100, 50) for i, name in enumerate(names)])
     explorer = DataExplorer(path)
     for i, name in enumerate(names):
-        result = explorer.search(Filters(name))
-        assert result["total_count"] == 1
-        assert result["rows"][0]["transaction_id"] == i
+        for filters in (Filters(name), Filters(property_type=name)):
+            result = explorer.search(filters)
+            assert result["total_count"] == 1
+            assert result["rows"][0]["transaction_id"] == i
 
 
 def test_group_count_is_measured_before_limit(tmp_path):
     path = tmp_path / "groups.parquet"
-    _write_transactions(path, [(i, f"region-{i:03}", 2024, 1, i, 50) for i in range(205)])
+    _write_transactions(
+        path, [(i, f"region-{i:03}", 2024, 1, "宅地(土地)", i, 50) for i in range(205)]
+    )
     result = DataExplorer(path).aggregate("municipality", Filters())
     assert result["total_count"] == 205
     assert result["returned_count"] == 200
@@ -93,7 +137,8 @@ def test_group_count_is_measured_before_limit(tmp_path):
 def test_aggregate_rounding_and_price_bounds(tmp_path):
     path = tmp_path / "rounding.parquet"
     _write_transactions(
-        path, [(i, "新宿区", 2024, 1, price, 50) for i, price in enumerate([1, 1, 2])]
+        path,
+        [(i, "品川区", 2024, 1, "宅地(土地)", price, 50) for i, price in enumerate([1, 1, 2])],
     )
     result = DataExplorer(path).aggregate("year", Filters(min_price_yen=1, max_price_yen=2))
     assert result["rows"] == [
@@ -107,7 +152,7 @@ def test_aggregate_rounding_and_price_bounds(tmp_path):
     ]
 
 
-def test_untrusted_values_cannot_become_sql(parquet):
+def test_untrusted_values_cannot_become_sql(parquet, source_rows):
     explorer = DataExplorer(parquet)
     assert explorer.search(Filters("' OR 1=1 --"))["total_count"] == 0
     with pytest.raises(ValueError):
@@ -119,22 +164,20 @@ def test_untrusted_values_cannot_become_sql(parquet):
         Filters(year=True),
         Filters(min_price_yen=-1),
         Filters(min_price_yen=10, max_price_yen=1),
+        Filters(property_type="x" * 41),
     ]:
         with pytest.raises(ValueError):
             explorer.search(filters)
-    assert explorer.describe()["row_count"] == 360
+    assert explorer.describe()["row_count"] == len(source_rows)
 
 
-def test_connections_can_run_independently(parquet):
+def test_connections_can_run_independently(parquet, source_rows):
     explorer = DataExplorer(parquet)
     with ThreadPoolExecutor(max_workers=3) as executor:
         results = list(
-            executor.map(
-                lambda name: explorer.search(Filters(name))["total_count"],
-                ["千代田区", "新宿区", "渋谷区"],
-            )
+            executor.map(lambda name: explorer.search(Filters(name))["total_count"], MUNICIPALITIES)
         )
-    assert results == [120] * 3
+    assert results == [sum(r["市区町村名"] == name for r in source_rows) for name in MUNICIPALITIES]
 
 
 def test_result_artifact_and_model_projection(parquet, tmp_path):
@@ -146,6 +189,7 @@ def test_result_artifact_and_model_projection(parquet, tmp_path):
     assert len(preview["preview_rows"]) == 20
     assert len(summary["sample_rows"]) == 3
     assert summary["sample_truncated"]
+    assert "国土交通省" in summary["attribution"]
     assert "rows" not in summary
     with pytest.raises(ValueError):
         store.get("../secret")

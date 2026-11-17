@@ -31,7 +31,7 @@ def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore
 
     @server.tool()
     async def describe_dataset() -> dict:
-        """合成データのスキーマ・単位・地域候補・件数を確認する。取引探索の最初に呼ぶ。"""
+        """取引データの項目・単位・地域と種類の候補・期間・件数・出典を確認する。最初に呼ぶ。"""
         return await asyncio.to_thread(explorer.describe)
 
     @server.tool()
@@ -41,32 +41,38 @@ def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore
         min_price_yen: int | None = None,
         max_price_yen: int | None = None,
         limit: int = 100,
+        property_type: str = "",
     ) -> CallToolResult:
-        """合成取引を地域の完全一致・年・価格範囲（円、以上／以下）で検索する。
+        """取引を地域・種類の完全一致・年・価格範囲（円、以上／以下）で検索する。
 
-        municipalityが空なら全地域。未指定の年・価格では絞り込まない。
+        municipality・property_typeが空なら全件。未指定の年・価格では絞り込まない。
         limitは1〜200。モデルには最大3行、画面には最大20行を返す。
         """
         result = await asyncio.to_thread(
-            explorer.search, Filters(municipality, year, min_price_yen, max_price_yen), limit
+            explorer.search,
+            Filters(municipality, year, property_type, min_price_yen, max_price_yen),
+            limit,
         )
         return publish(result)
 
     @server.tool()
     async def aggregate_transactions(
-        group_by: Literal["municipality", "year", "quarter"],
+        group_by: Literal["municipality", "year", "quarter", "property_type"],
         municipality: str = "",
         year: int | None = None,
         min_price_yen: int | None = None,
         max_price_yen: int | None = None,
+        property_type: str = "",
     ) -> CallToolResult:
-        """合成取引を地域・年・四半期で集計し、件数と価格（円）の平均・最小・最大を返す。
+        """取引を地域・年・四半期・種類で集計し、件数と価格（円）の平均・最小・最大を返す。
 
         quarterは対象期間の同じ四半期を合算する。年別比較にはyearを指定する。
-        municipalityが空なら全地域。未指定の年・価格では絞り込まない。
+        municipality・property_typeが空なら全件。土地のみと土地建物の混在に注意する。
         """
         result = await asyncio.to_thread(
-            explorer.aggregate, group_by, Filters(municipality, year, min_price_yen, max_price_yen)
+            explorer.aggregate,
+            group_by,
+            Filters(municipality, year, property_type, min_price_yen, max_price_yen),
         )
         return publish(result)
 

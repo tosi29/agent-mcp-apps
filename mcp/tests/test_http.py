@@ -104,7 +104,7 @@ async def test_search_keeps_artifact_preview_and_model_content_separate(parquet,
         preview = result["structuredContent"]
         assert len(summary["sample_rows"]) == 3
         assert len(preview["preview_rows"]) == 20
-        assert summary["total_count"] == preview["total_count"] == 360
+        assert summary["total_count"] == preview["total_count"] == 4143
         assert "preview_rows" not in json.dumps(result["content"])
         artifact = json.loads((tmp_path / "results" / f"{preview['result_id']}.json").read_text())
         assert len(artifact["rows"]) == 200
@@ -115,13 +115,14 @@ async def test_search_keeps_artifact_preview_and_model_content_separate(parquet,
                 "tools/call",
                 {
                     "name": "aggregate_transactions",
-                    "arguments": {"municipality": "新宿区", "group_by": "year"},
+                    "arguments": {"municipality": "品川区", "group_by": "year"},
                 },
             ),
             headers={"Mcp-Method": "tools/call", "Mcp-Name": "aggregate_transactions"},
         )
         rows = reply.json()["result"]["structuredContent"]["preview_rows"]
-        assert [r["transaction_count"] for r in rows] == [40, 40, 40]
+        assert [r["year"] for r in rows] == [2023, 2024, 2025]
+        assert sum(r["transaction_count"] for r in rows) == 1190
 
 
 def test_missing_mcp_data_is_rejected_at_startup(tmp_path):
@@ -180,7 +181,7 @@ async def test_app_discovery_resource_and_model_fallback(parquet, tmp_path):
                     "tools/call",
                     {
                         "name": "show_transaction_dashboard",
-                        "arguments": {"group_by": "quarter", "municipality": "新宿区"},
+                        "arguments": {"group_by": "quarter", "municipality": "品川区"},
                     },
                 ),
                 headers={"Mcp-Method": "tools/call", "Mcp-Name": "show_transaction_dashboard"},

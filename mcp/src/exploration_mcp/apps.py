@@ -31,17 +31,20 @@ def dashboard_app(explorer: DataExplorer, store: ResultStore) -> Apps:
 
     @apps.tool(resource_uri=DASHBOARD_URI, visibility=["model", "app"])
     async def show_transaction_dashboard(
-        group_by: Literal["municipality", "year", "quarter"] = "year",
+        group_by: Literal["municipality", "year", "quarter", "property_type"] = "year",
         municipality: str = "",
         year: int | None = None,
+        property_type: str = "",
     ) -> CallToolResult:
-        """合成取引を集計し、MCP Appsの棒グラフと表で表示する。グラフやダッシュボードの依頼に使う。
+        """取引を集計し、MCP Appsの棒グラフと表で表示する。グラフ・ダッシュボード用。
 
-        group_byは地域・年・四半期。municipalityが空なら全地域、year未指定なら全年。
+        group_byは地域・年・四半期・種類。municipality・property_typeが空なら全件。
         quarterは対象期間の同じ四半期を合算する。年別比較にはyearを使う。
         UI非対応クライアントでも、件数と最大3行の要約を返す。
         """
-        result = await asyncio.to_thread(explorer.aggregate, group_by, Filters(municipality, year))
+        result = await asyncio.to_thread(
+            explorer.aggregate, group_by, Filters(municipality, year, property_type)
+        )
         preview = store.put({"source": "mcp", "group_by": group_by, **result})
         summary = model_summary(result, preview["result_id"])
         return CallToolResult(

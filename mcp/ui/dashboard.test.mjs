@@ -73,6 +73,7 @@ test("dashboard renders tool data, changes the metric, treats labels as text and
   assert.equal(elements.rows.children.length, 2);
   assert.equal(elements.rows.children[0].children[0].textContent, "<img src=x>");
   assert.equal(elements.chart.children[0].children[1].children[0].style.width, "50%");
+  assert.ok(elements.status.textContent.includes("国土交通省 不動産情報ライブラリ"));
   assert.equal(elements.chart.children[1].children[1].children[0].style.width, "100%");
   elements.metric.value = "transaction_count";
   elements.metric.selectedOptions = [{ textContent: "取引件数" }];

@@ -4,9 +4,9 @@
 
 | ツール | 機能 |
 | --- | --- |
-| `describe_dataset` | データ項目・単位・地域候補・件数の確認 |
-| `search_transactions` | 地域の完全一致・年・価格範囲で検索 |
-| `aggregate_transactions` | 地域・年・四半期で件数・価格の平均／最小／最大を集計 |
+| `describe_dataset` | データ項目・単位・地域と種類の候補・期間・件数・出典の確認 |
+| `search_transactions` | 地域・種類の完全一致・年・価格範囲で検索 |
+| `aggregate_transactions` | 地域・年・四半期・種類で件数・価格の平均／最小／最大を集計 |
 | `compare_values` | 2数値の差分・増減率を計算 |
 | `show_transaction_dashboard` | 集計結果をMCP Appsの棒グラフ・表で表示 |
 
@@ -21,27 +21,47 @@ npm --prefix mcp/ui ci --ignore-scripts
 npm --prefix mcp/ui run build
 cd mcp
 uv sync --locked
-uv run --locked explore-mcp prepare-sample
+uv run --locked explore-mcp prepare-data
 uv run --locked explore-mcp
 ```
 
 接続先は `http://127.0.0.1:8001/mcp`。Streamable HTTPを使い、各リクエストには単一のJSONで応答する。
 SSEの購読や永続セッションは使わない。ポートは `--port` で変更できる。
 APIキーとモデルAPIは不要。DuckDBで信頼済みのローカルParquetを検索する。
-`prepare-sample` は360行の架空取引を `mcp/data/synthetic.parquet` に生成する。生成済みなら省略する。
-地域は千代田区・新宿区・渋谷区、期間は2023〜2025年。価格・面積・時期は架空で、市場価格の判断に使えない。
+`prepare-data` は `source/` のCSVから `data/transactions.parquet` を生成し、既存のファイルを置き換える。
 `--data`／`MCP_DATA_PATH` はサーバー管理者が設定し、ツール引数にはパスを受け付けない。
 このコマンドはループバック限定・認証なしのローカル検証用。
 
+## データと出典
+
+出典：[国土交通省 不動産情報ライブラリ](https://www.reinfolib.mlit.go.jp/)。「不動産取引価格情報」（国土交通省）をもとに本PoCで列の選択・変換を行って作成。
+公共データ利用規約（第1.0版）に基づき利用する。
+
+`source/` には、不動産情報ライブラリの「不動産価格（取引価格・成約価格）情報の検索・ダウンロード」から
+手動で取得したCSVを、内容を変えずに置いている（Shift_JIS・CRLF。ファイル名のみ変更）。
+
+| ファイル | 地域 | 期間 | 件数 |
+| --- | --- | --- | ---: |
+| `tokyo_shinagawa_20231_20254.csv` | 東京都品川区 | 2023年第1四半期〜2025年第4四半期 | 1,190 |
+| `tokyo_ota_20231_20254.csv` | 東京都大田区 | 同上 | 2,486 |
+| `kanagawa_kawasaki_saiwai_20231_20254.csv` | 神奈川県川崎市幸区 | 同上 | 467 |
+
+- 種類は宅地(土地)と宅地(土地と建物)だけ。成約価格情報（レインズ由来）は含めない。
+- 国土交通省のアンケート回答をもとに、個別物件を特定できないよう加工された情報で、全取引ではない。
+- `prepare-data` が行う加工：市区町村名・取引時期（年・四半期）・種類・取引価格（総額）・面積だけを選び、
+  行IDを採番する。面積「2,000㎡以上」は数値に置き換えず欠損にする。値の補正・推計はしない。
+- 列の構成・価格情報区分・取引時期・数値の形式が想定と異なるCSVは、変換せずにエラーにする。
+- データを追加・更新するときは、同じ画面から取得したCSVを `source/` に置き、上の表を更新する。
+
 ## MCP Apps
 
-`show_transaction_dashboard` は `group_by`（地域・年・四半期）・`municipality`・`year` で集計する。
+`show_transaction_dashboard` は `group_by`（地域・年・四半期・種類）・`municipality`・`year`・`property_type` で集計する。
 ツールの `_meta.ui.resourceUri` は `ui://exploration/transaction-dashboard-v1.html` を参照し、
 `resources/read` で `text/html;profile=mcp-app` のHTMLを返す。公式Python SDKの `Apps` 拡張を使う。
 
 `mcp/ui/` は公式Apps SDKを含む自己完結HTMLを生成する。成果物はGit管理外で、wheelには明示的に含める。
 DockerビルドではNodeステージで生成し、Pythonイメージへコピーする。実行時にNodeや外部CDNは使わない。
-画面では平均取引総額と取引件数を切り替えられる。追加のサーバー呼び出しは行わない。
+画面では平均取引総額と取引件数を切り替えられ、出典を表示する。追加のサーバー呼び出しは行わない。
 
 モデル向けの `content`・`structuredContent` は最大3行の要約。画面用の最大20行は結果の `_meta.preview` に置く。
 UI非対応クライアントでも同じテキスト要約を利用できる。通常の4ツールの戻り値は変更しない。
@@ -49,10 +69,11 @@ UI非対応クライアントでも同じテキスト要約を利用できる。
 
 ## 検索と結果の制約
 
-検索は `municipality / year / min_price_yen / max_price_yen` を使う。
-列は `transaction_id / municipality / year / quarter / price_yen / area_m2`。
-地域はNFKC正規化・前後空白除去後の完全一致。複数キーワード・部分一致モードは未実装。
-集計単位は `municipality / year / quarter` の許可リストから選ぶ。
+検索は `municipality / year / property_type / min_price_yen / max_price_yen` を使う。
+列は `transaction_id / municipality / year / quarter / property_type / price_yen / area_m2`。
+地域・種類はNFKC正規化・前後空白除去後の完全一致。複数キーワード・部分一致モードは未実装。
+集計単位は `municipality / year / quarter / property_type` の許可リストから選ぶ。
+平均価格は面積調整しておらず、種類を混ぜると土地のみと土地建物の価格が混在する。
 
 DuckDBのRelational API・Expression APIで条件を構築し、任意SQL・列・テーブル・パスを受け付けない。
 各操作で接続を作り直し、信頼済みParquet以外の外部アクセス・拡張の自動取得を禁止する。
@@ -101,7 +122,8 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 ```
 
 さらに `app/` で `npm run dev` を実行し、<http://127.0.0.1:3000> を開く。
-fixtureは項目確認・新宿区の年別集計・平均取引総額の比較を行う固定シナリオを実行する。
+fixtureは項目確認・品川区の年別集計・固定値の比較を行う固定シナリオを実行する。
+固定の回答文には集計値を含めず、結果パネルを参照させる。
 質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換える。
 右側に集計結果と比較結果が別々に追加される。推論APIは呼ばない。
 MCP接続先を指定しないエージェントはMCPに接続しない。
@@ -111,7 +133,7 @@ MCP接続先を指定しないエージェントはMCPに接続しない。
 
 ## AgentCoreへの配備
 
-`Dockerfile` は合成ParquetとDuckDBを含むAgentCore向けのARM64コンテナを作る。専用のエントリーポイントは
+`Dockerfile` は `source/` のCSVから生成したParquetとDuckDBを含むAgentCore向けのARM64コンテナを作る。専用のエントリーポイントは
 `0.0.0.0:8000/mcp` と `GET /ping` を提供する。ローカル起動の設定とは分けている。
 
 ```sh

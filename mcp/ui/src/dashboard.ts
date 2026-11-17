@@ -66,7 +66,7 @@ app.ontoolresult = (result) => {
   groupBy = preview.group_by ?? "year";
   element("subtitle").textContent = `${rows.length}区分の集計結果`;
   element("status").textContent = rows.length
-    ? "合成データによる集計です。実際の市場価格ではありません。"
+    ? "出典：国土交通省 不動産情報ライブラリ。「不動産取引価格情報」をもとに加工して作成。"
     : "条件に合うデータはありませんでした。";
   render();
 };
