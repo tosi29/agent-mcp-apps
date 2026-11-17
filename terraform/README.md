@@ -171,7 +171,7 @@ terraform -chdir=terraform output -raw mcp_apps_sandbox_url
 ```
 
 planでAPI Gateway関連とLambda invoke permissionの追加、既存LambdaのZIP・環境変数更新を確認する。
-配備後は許可したIPからチャットを開き、「新宿区の年別ダッシュボードを表示して」で
+配備後は許可したIPからチャットを開き、「品川区の年別ダッシュボードを表示して」で
 iframe表示・指標切り替え・履歴の開閉を確認する。sandbox URLのHTTP確認だけでは描画確認にはならない。
 API Gateway・Lambda・AgentCoreの利用料金が発生し得る。
 
@@ -223,7 +223,7 @@ cd app
 SMOKE_URL="$WEB_URL" npm run smoke
 ```
 
-画面・静的ファイル・SSE・独立した結果イベント・合成データの期待値・正常終了を検査する。
+画面・静的ファイル・SSE・独立した結果イベント・品川区の年別集計の期待値・正常終了を検査する。
 ブラウザの描画確認は別途必要。Lambda、API Gateway、AgentCoreの利用料金は発生し得る。
 
 ## AgentCoreのログとテレメトリ

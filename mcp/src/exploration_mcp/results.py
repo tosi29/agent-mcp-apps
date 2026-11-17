@@ -69,7 +69,7 @@ def csv_link(preview: dict[str, Any]) -> ResourceLink:
     return ResourceLink(
         uri=CSV_URI_TEMPLATE.format(result_id=preview["result_id"]),
         name=f"result-{preview['result_id']}.csv",
-        title="保存した結果のCSV（合成データ）",
+        title="保存した結果のCSV（不動産取引価格情報を加工して作成）",
         description=(
             f"保存済みの{preview['returned_count']}行。"
             "同じMCPサーバーでresources/readすると取得できる一時ファイル。"
@@ -85,5 +85,5 @@ def model_summary(result: dict[str, Any], result_id: str) -> dict[str, Any]:
         "result_id": result_id,
         "sample_rows": result["rows"][:3],
         "sample_truncated": result["total_count"] > 3,
-        "notice": "合成データ。sample_rowsは全件ではない。参照IDはMCP側の一時保存用。",
+        "notice": "sample_rowsは全件ではない。参照IDはMCP側の一時保存用。回答には出典を添える。",
     }

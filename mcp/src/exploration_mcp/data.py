@@ -23,36 +23,32 @@ from duckdb import (
     when,
 )
 
+DATASET = "mlit-transaction-prices-v1"
+ATTRIBUTION = (
+    "出典：国土交通省 不動産情報ライブラリ（https://www.reinfolib.mlit.go.jp/）。"
+    "「不動産取引価格情報」（国土交通省）をもとに本PoCで列の選択・変換を行って作成"
+)
+NOTICE = (
+    "国土交通省のアンケート回答をもとにした不動産取引価格情報で、全取引ではない。"
+    "個別物件を特定できないよう加工・丸めされている。価格は取引総額（円）で面積調整していない。"
+    "種類（土地のみ／土地と建物）を混ぜた平均は比較に注意。面積2,000㎡以上は面積が欠損。"
+)
 MAX_ROWS = 200
 COLUMNS = {
-    "transaction_id": "合成取引ID",
+    "transaction_id": "取り込み時に採番した行ID（元データにIDはない）",
     "municipality": "市区町村（完全一致。候補はdescribe_datasetで確認）",
     "year": "取引年（西暦）",
-    "quarter": "四半期（1〜4）",
-    "price_yen": "合成取引総額（円）。単価ではない",
-    "area_m2": "合成面積（平方メートル）",
+    "quarter": "取引の四半期（1〜4）",
+    "property_type": "種類（宅地(土地)／宅地(土地と建物)。完全一致）",
+    "price_yen": "取引価格（総額、円）。単価ではない",
+    "area_m2": "土地の面積（平方メートル）。2,000㎡以上は欠損",
 }
-GROUPS = {"municipality": "municipality", "year": "year", "quarter": "quarter"}
-
-
-def prepare_sample(path: Path) -> None:
-    """Generate 360 deterministic fictional rows, unrelated to actual transactions."""
-    path = path.resolve()
-    if path.exists():
-        raise FileExistsError("サンプルが既にあります。再生成は別の出力先を指定してください。")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(config={"threads": 1, "memory_limit": "256MB"}) as conn:
-        conn.execute("""
-            CREATE TABLE sample AS SELECT
-              i + 1 AS transaction_id,
-              ['千代田区', '新宿区', '渋谷区'][1 + (i % 3)] AS municipality,
-              2023 + ((i // 3) % 3) AS year,
-              1 + ((i // 9) % 4) AS quarter,
-              20000000 + (i % 10) * 5000000 AS price_yen,
-              30 + (i % 8) * 10 AS area_m2
-            FROM range(360) AS t(i)
-        """)
-        conn.execute("COPY sample TO ? (FORMAT PARQUET)", [str(path)])
+GROUPS = {
+    "municipality": "municipality",
+    "year": "year",
+    "quarter": "quarter",
+    "property_type": "property_type",
+}
 
 
 def _integer(name: str, value: int, minimum: int, maximum: int) -> None:
@@ -64,12 +60,17 @@ def _integer(name: str, value: int, minimum: int, maximum: int) -> None:
 class Filters:
     municipality: str = ""
     year: int | None = None
+    property_type: str = ""
     min_price_yen: int | None = None
     max_price_yen: int | None = None
 
     def expression(self) -> Expression:
-        if not isinstance(self.municipality, str) or len(self.municipality) > 40:
-            raise ValueError("municipality must be a string of at most 40 characters")
+        for name, text in (
+            ("municipality", self.municipality),
+            ("property_type", self.property_type),
+        ):
+            if not isinstance(text, str) or len(text) > 40:
+                raise ValueError(f"{name} must be a string of at most 40 characters")
         for name, value, low, high in (
             ("year", self.year, 1900, 2100),
             ("min_price_yen", self.min_price_yen, 0, 10**12),
@@ -89,6 +90,10 @@ class Filters:
             predicate &= col("municipality") == lit(municipality)
         if self.year is not None:
             predicate &= col("year") == lit(self.year)
+        property_type = unicodedata.normalize("NFKC", self.property_type).strip()
+        if property_type:
+            # Source values contain ASCII parentheses, which NFKC also produces.
+            predicate &= col("property_type") == lit(property_type)
         if self.min_price_yen is not None:
             predicate &= col("price_yen") >= lit(self.min_price_yen)
         if self.max_price_yen is not None:
@@ -159,13 +164,20 @@ class DataExplorer:
                 )
             )
         )
-        actual = {column["column_name"] for column in schema}
-        if actual != set(COLUMNS):
-            raise ValueError("unsupported schema; this PoC accepts only its synthetic fixture")
+        if [column["column_name"] for column in schema] != list(COLUMNS):
+            raise ValueError("unsupported schema; create the file with prepare-data")
+        period = self._query(
+            lambda conn: conn.table("transactions").aggregate(
+                [
+                    fn("min", col("year") * lit(10) + col("quarter")).alias("first"),
+                    fn("max", col("year") * lit(10) + col("quarter")).alias("last"),
+                ]
+            )
+        )[0]
         return {
-            "dataset": "synthetic-real-estate-v1",
-            "synthetic": True,
-            "notice": "架空データ。国交省の実データではなく、市場価格の判断に使えません。",
+            "dataset": DATASET,
+            "attribution": ATTRIBUTION,
+            "notice": NOTICE,
             "columns": [{**column, "meaning": COLUMNS[column["column_name"]]} for column in schema],
             "municipalities": self._query(
                 lambda conn: (
@@ -176,6 +188,17 @@ class DataExplorer:
                     .limit(20)
                 )
             ),
+            "property_types": self._query(
+                lambda conn: (
+                    conn.table("transactions")
+                    .select(col("property_type"))
+                    .distinct()
+                    .order(col("property_type"))
+                    .limit(20)
+                )
+            ),
+            "first_period": f"{period['first'] // 10}年第{period['first'] % 10}四半期",
+            "last_period": f"{period['last'] // 10}年第{period['last'] % 10}四半期",
             "row_count": self._query(
                 lambda conn: conn.table("transactions").aggregate([count_all().alias("n")])
             )[0]["n"],
@@ -194,7 +217,7 @@ class DataExplorer:
 
     def aggregate(self, group_by: str, filters: Filters) -> dict[str, Any]:
         if group_by not in GROUPS:
-            raise ValueError("group_by must be municipality, year, or quarter")
+            raise ValueError("group_by must be municipality, year, quarter, or property_type")
         group = col(GROUPS[group_by])
         predicate = filters.expression()
 
@@ -224,8 +247,8 @@ class DataExplorer:
         for row in rows:
             row.pop("_total")
         return {
-            "dataset": "synthetic-real-estate-v1",
-            "synthetic": True,
+            "dataset": DATASET,
+            "attribution": ATTRIBUTION,
             "total_count": total,
             "count_unit": unit,
             "returned_count": len(rows),
