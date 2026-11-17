@@ -31,42 +31,51 @@ def register_tools(server: MCPServer, explorer: DataExplorer, store: ResultStore
 
     @server.tool()
     async def describe_dataset() -> dict:
-        """合成データのスキーマ・単位・地域候補・件数を確認する。取引探索の最初に呼ぶ。"""
+        """オフィス市況データの項目・単位・地区候補・期間・合成データかを確認する。探索の最初に呼ぶ。"""
         return await asyncio.to_thread(explorer.describe)
 
     @server.tool()
-    async def search_transactions(
-        municipality: str = "",
-        year: int | None = None,
-        min_price_yen: int | None = None,
-        max_price_yen: int | None = None,
+    async def search_office_market(
+        area: str = "",
+        year_from: int | None = None,
+        year_to: int | None = None,
+        month: int | None = None,
+        min_vacancy_rate_pct: float | None = None,
+        max_vacancy_rate_pct: float | None = None,
         limit: int = 100,
     ) -> CallToolResult:
-        """合成取引を地域の完全一致・年・価格範囲（円、以上／以下）で検索する。
+        """地区・月ごとの平均空室率（％）と平均賃料（円/坪）を検索する。
 
-        municipalityが空なら全地域。未指定の年・価格では絞り込まない。
-        limitは1〜200。モデルには最大3行、画面には最大20行を返す。
+        areaは地区名の完全一致で、空なら全地区。year_from・year_toは両端を含む。
+        monthは1〜12。空室率の範囲は以上／以下。未指定の条件では絞り込まない。
+        結果は年・月の昇順。limitは1〜200。モデルには最大3行、画面には最大20行を返す。
         """
         result = await asyncio.to_thread(
-            explorer.search, Filters(municipality, year, min_price_yen, max_price_yen), limit
+            explorer.search,
+            Filters(area, year_from, year_to, month, min_vacancy_rate_pct, max_vacancy_rate_pct),
+            limit,
         )
         return publish(result)
 
     @server.tool()
-    async def aggregate_transactions(
-        group_by: Literal["municipality", "year", "quarter"],
-        municipality: str = "",
-        year: int | None = None,
-        min_price_yen: int | None = None,
-        max_price_yen: int | None = None,
+    async def aggregate_office_market(
+        group_by: Literal["area", "year", "month"],
+        area: str = "",
+        year_from: int | None = None,
+        year_to: int | None = None,
+        month: int | None = None,
+        min_vacancy_rate_pct: float | None = None,
+        max_vacancy_rate_pct: float | None = None,
     ) -> CallToolResult:
-        """合成取引を地域・年・四半期で集計し、件数と価格（円）の平均・最小・最大を返す。
+        """地区・年・月で集計し、月数と空室率・賃料の単純平均・最小・最大を返す。
 
-        quarterは対象期間の同じ四半期を合算する。年別比較にはyearを指定する。
-        municipalityが空なら全地域。未指定の年・価格では絞り込まない。
+        平均は月次値の単純平均で、面積加重ではない。monthは対象期間の同じ月を合算する。
+        areaが空なら全地区を混ぜて集計するため、地区別の値が必要ならareaを指定する。
         """
         result = await asyncio.to_thread(
-            explorer.aggregate, group_by, Filters(municipality, year, min_price_yen, max_price_yen)
+            explorer.aggregate,
+            group_by,
+            Filters(area, year_from, year_to, month, min_vacancy_rate_pct, max_vacancy_rate_pct),
         )
         return publish(result)
 

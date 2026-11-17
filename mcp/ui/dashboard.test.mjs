@@ -49,8 +49,8 @@ test("dashboard renders tool data, changes the metric, treats labels as text and
   const elements = Object.fromEntries(
     ["chart", "rows", "metric", "subtitle", "status"].map((id) => [id, new Element()]),
   );
-  elements.metric.value = "average_price_yen";
-  elements.metric.selectedOptions = [{ textContent: "平均取引総額" }];
+  elements.metric.value = "mean_rent_yen_per_tsubo";
+  elements.metric.selectedOptions = [{ textContent: "平均賃料（円/坪）" }];
   const context = {
     document: {
       getElementById: (id) => elements[id],
@@ -61,10 +61,12 @@ test("dashboard renders tool data, changes the metric, treats labels as text and
   const data = {
     _meta: {
       preview: {
-        group_by: "municipality",
+        group_by: "area",
+        total_count: 30,
+        synthetic: false,
         preview_rows: [
-          { municipality: "<img src=x>", transaction_count: 4, average_price_yen: 100 },
-          { municipality: "新宿区", transaction_count: 1, average_price_yen: 200 },
+          { area: "<img src=x>", mean_vacancy_rate_pct: 4, mean_rent_yen_per_tsubo: 100 },
+          { area: "新宿区", mean_vacancy_rate_pct: 1, mean_rent_yen_per_tsubo: 200 },
         ],
       },
     },
@@ -74,12 +76,14 @@ test("dashboard renders tool data, changes the metric, treats labels as text and
   assert.equal(elements.rows.children[0].children[0].textContent, "<img src=x>");
   assert.equal(elements.chart.children[0].children[1].children[0].style.width, "50%");
   assert.equal(elements.chart.children[1].children[1].children[0].style.width, "100%");
-  elements.metric.value = "transaction_count";
-  elements.metric.selectedOptions = [{ textContent: "取引件数" }];
+  assert.equal(elements.subtitle.textContent, "全30区分のうち先頭2区分");
+  assert.ok(elements.status.textContent.includes("単純平均"));
+  elements.metric.value = "mean_vacancy_rate_pct";
+  elements.metric.selectedOptions = [{ textContent: "平均空室率（％）" }];
   elements.metric.listeners.change();
   assert.equal(elements.chart.children[0].children[1].children[0].style.width, "100%");
   assert.equal(elements.chart.children[1].children[1].children[0].style.width, "25%");
-  assert.equal(elements.chart.attributes["aria-label"], "取引件数の棒グラフ、2区分");
+  assert.equal(elements.chart.attributes["aria-label"], "平均空室率（％）の棒グラフ、2区分");
   context.app.ontoolresult({ _meta: { preview: { preview_rows: [] } } });
   assert.equal(elements.rows.children.length, 0);
   assert.equal(elements.chart.children.length, 0);

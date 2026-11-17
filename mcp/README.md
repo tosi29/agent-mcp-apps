@@ -4,11 +4,11 @@
 
 | ツール | 機能 |
 | --- | --- |
-| `describe_dataset` | データ項目・単位・地域候補・件数の確認 |
-| `search_transactions` | 地域の完全一致・年・価格範囲で検索 |
-| `aggregate_transactions` | 地域・年・四半期で件数・価格の平均／最小／最大を集計 |
+| `describe_dataset` | データ項目・単位・地区候補・期間・件数・合成データかの確認 |
+| `search_office_market` | 地区の完全一致・期間・月・空室率範囲で月次値を検索 |
+| `aggregate_office_market` | 地区・年・月で月数と空室率・賃料の平均／最小／最大を集計 |
 | `compare_values` | 2数値の差分・増減率を計算 |
-| `show_transaction_dashboard` | 集計結果をMCP Appsの棒グラフ・表で表示 |
+| `show_office_market_dashboard` | 集計結果をMCP Appsの棒グラフ・表で表示 |
 
 DuckDB・Parquet・結果ファイルはこのプロジェクトが管理する。Strandsには依存しない。
 
@@ -28,20 +28,38 @@ uv run --locked explore-mcp
 接続先は `http://127.0.0.1:8001/mcp`。Streamable HTTPを使い、各リクエストには単一のJSONで応答する。
 SSEの購読や永続セッションは使わない。ポートは `--port` で変更できる。
 APIキーとモデルAPIは不要。DuckDBで信頼済みのローカルParquetを検索する。
-`prepare-sample` は360行の架空取引を `mcp/data/synthetic.parquet` に生成する。生成済みなら省略する。
-地域は千代田区・新宿区・渋谷区、期間は2023〜2025年。価格・面積・時期は架空で、市場価格の判断に使えない。
+`prepare-sample` は216行の架空データを `mcp/data/office-market.parquet` に生成する。生成済みなら省略する。
+地区は東京ビジネス地区（都心5区の合計）と千代田区・中央区・港区・新宿区・渋谷区、期間は2023〜2025年の各月。
+空室率・賃料は架空で、市況の判断に使えない。
+
+## 実データの取り込み
+
+公表元のサイトから東京ビジネス地区の月次Excelを手動でダウンロードし、`mcp/` で変換する。
+
+```sh
+uv run --locked explore-mcp import-excel ダウンロードしたファイル.xlsx
+```
+
+- 1枚目のシートの2行目に地区名、3行目に「平均空室率(％)」「平均賃料（円/坪）」、4行目以降にYYYYMMと値がある形式だけを受け付ける。
+  異なる場合は変換せずにエラーにする。最大5MB。
+- 値と地区名・項目名は変更せずに格納する。列IDだけ英字にし、`describe_dataset` の説明に元の項目名を残す。
+  空欄の月は欠損（null）として保持し、推計・補間しない。2001年以前は各年12月の値だけを含む。
+- `--data` のParquetを一時ファイル経由で置き換える。ネットワークからの自動取得は行わない。
+- Parquetのメタデータに合成か実データかを記録する。印のないParquetは起動時に拒否する。
+- 実データは `mcp/data/` に置き、コミットしない（Git管理外）。
 `--data`／`MCP_DATA_PATH` はサーバー管理者が設定し、ツール引数にはパスを受け付けない。
 このコマンドはループバック限定・認証なしのローカル検証用。
 
 ## MCP Apps
 
-`show_transaction_dashboard` は `group_by`（地域・年・四半期）・`municipality`・`year` で集計する。
-ツールの `_meta.ui.resourceUri` は `ui://exploration/transaction-dashboard-v1.html` を参照し、
+`show_office_market_dashboard` は `group_by`（地区・年・月）・`area`・`year_from`・`year_to` で集計する。
+ツールの `_meta.ui.resourceUri` は `ui://exploration/office-market-dashboard-v1.html` を参照し、
 `resources/read` で `text/html;profile=mcp-app` のHTMLを返す。公式Python SDKの `Apps` 拡張を使う。
 
 `mcp/ui/` は公式Apps SDKを含む自己完結HTMLを生成する。成果物はGit管理外で、wheelには明示的に含める。
 DockerビルドではNodeステージで生成し、Pythonイメージへコピーする。実行時にNodeや外部CDNは使わない。
-画面では平均取引総額と取引件数を切り替えられる。追加のサーバー呼び出しは行わない。
+画面では平均空室率と平均賃料を切り替えられる。追加のサーバー呼び出しは行わない。
+表示は先頭20区分までで、超える場合は全区分数を示す。年別で20年を超える場合は期間を絞る。
 
 モデル向けの `content`・`structuredContent` は最大3行の要約。画面用の最大20行は結果の `_meta.preview` に置く。
 UI非対応クライアントでも同じテキスト要約を利用できる。通常の4ツールの戻り値は変更しない。
@@ -49,10 +67,11 @@ UI非対応クライアントでも同じテキスト要約を利用できる。
 
 ## 検索と結果の制約
 
-検索は `municipality / year / min_price_yen / max_price_yen` を使う。
-列は `transaction_id / municipality / year / quarter / price_yen / area_m2`。
-地域はNFKC正規化・前後空白除去後の完全一致。複数キーワード・部分一致モードは未実装。
-集計単位は `municipality / year / quarter` の許可リストから選ぶ。
+検索は `area / year_from / year_to / month / min_vacancy_rate_pct / max_vacancy_rate_pct` を使う。
+列は `area / year / month / vacancy_rate_pct / rent_yen_per_tsubo`（平均空室率％・平均賃料円/坪）。
+地区はNFKC正規化・前後空白除去後の完全一致。複数キーワード・部分一致モードは未実装。
+集計単位は `area / year / month` の許可リストから選ぶ。集計の平均は月次値の単純平均で、面積加重ではない。
+地区を指定しない集計は、東京ビジネス地区と各区を混ぜた単純平均になる。
 
 DuckDBのRelational API・Expression APIで条件を構築し、任意SQL・列・テーブル・パスを受け付けない。
 各操作で接続を作り直し、信頼済みParquet以外の外部アクセス・拡張の自動取得を禁止する。
@@ -101,7 +120,7 @@ uv run --locked explore-server --model fixture --mcp-url http://127.0.0.1:8001/m
 ```
 
 さらに `app/` で `npm run dev` を実行し、<http://127.0.0.1:3000> を開く。
-fixtureは項目確認・新宿区の年別集計・平均取引総額の比較を行う固定シナリオを実行する。
+fixtureは項目確認・千代田区の年別集計・固定値の比較を行う固定シナリオを実行する。
 質問に「ダッシュボード」または「グラフ」が含まれると、集計をMCP Appsツールへ置き換える。
 右側に集計結果と比較結果が別々に追加される。推論APIは呼ばない。
 MCP接続先を指定しないエージェントはMCPに接続しない。
@@ -111,7 +130,7 @@ MCP接続先を指定しないエージェントはMCPに接続しない。
 
 ## AgentCoreへの配備
 
-`Dockerfile` は合成ParquetとDuckDBを含むAgentCore向けのARM64コンテナを作る。専用のエントリーポイントは
+`Dockerfile` は合成ParquetとDuckDBを含むAgentCore向けのARM64コンテナを作る。実データは含めない。専用のエントリーポイントは
 `0.0.0.0:8000/mcp` と `GET /ping` を提供する。ローカル起動の設定とは分けている。
 
 ```sh
